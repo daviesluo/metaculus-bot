@@ -163,6 +163,18 @@ async def run(tournament: str | int, n: int, profile: str, with_baseline: bool, 
     client = MetaculusClient()
     api_filter = ApiFilter(allowed_statuses=["resolved"], allowed_tournaments=[tournament], group_question_mode="exclude")
     questions = await client.get_questions_matching_filter(api_filter, num_questions=150, error_if_question_target_missed=False)
+    if questions and all(q.resolution_string is None for q in questions):
+        # The list leaves the resolution out: read each question on its own page.
+        sample = (questions[0].api_json or {}).get("question", {})
+        print("the list's first question:", {k: sample.get(k) for k in ("status", "resolution", "actual_resolve_time", "resolution_set_time")})
+        full: list[MetaculusQuestion] = []
+        for q in sorted(questions, key=lambda q: q.id_of_question or 0):
+            try:
+                one = await asyncio.to_thread(client.get_question_by_post_id, q.id_of_post)
+                full.append(one if isinstance(one, MetaculusQuestion) else q)
+            except Exception as e:
+                print(f"could not re-read {q.page_url}: {type(e).__name__}")
+        questions = full
     chosen = pick(questions, n)
     from collections import Counter
     print("what was read:", dict(Counter(type(q).__name__ for q in questions)),
