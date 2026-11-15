@@ -159,22 +159,35 @@ def _baseline_bot(shared: dict[str, str]) -> TemplateBaseline:
     )
 
 
-async def run(tournament: str | int, n: int, profile: str, with_baseline: bool, max_usd: float) -> dict[str, Any]:
+async def _resolved(client: MetaculusClient, tournament: str | int, opened_after: datetime) -> list[MetaculusQuestion]:
+    api_filter = ApiFilter(allowed_statuses=["resolved"], allowed_tournaments=[tournament], group_question_mode="exclude", open_time_gt=opened_after)
+    try:
+        questions = await client.get_questions_matching_filter(api_filter, num_questions=150, error_if_question_target_missed=False)
+    except Exception as e:
+        print(f"{tournament}: could not be read ({type(e).__name__}: {str(e)[:120]})")
+        return []
+    shown = [q for q in questions if q.resolution_string is not None]
+    print(f"{tournament}: {len(questions)} resolved questions opened after {opened_after.date()}, {len(shown)} with their resolution shown")
+    return shown
+
+
+async def run(tournaments: list[str | int], n: int, profile: str, with_baseline: bool, max_usd: float, opened_after: datetime) -> dict[str, Any]:
+    """
+    `tournaments` are tried in turn until `n` usable questions are found: a running bot tournament hides its
+    resolutions, so the test falls back on tournaments that show them. `opened_after` keeps the questions later than the
+    models' training data.
+    """
     client = MetaculusClient()
-    api_filter = ApiFilter(allowed_statuses=["resolved"], allowed_tournaments=[tournament], group_question_mode="exclude")
-    questions = await client.get_questions_matching_filter(api_filter, num_questions=150, error_if_question_target_missed=False)
-    if questions and all(q.resolution_string is None for q in questions):
-        # The list leaves the resolution out: read each question on its own page.
-        sample = (questions[0].api_json or {}).get("question", {})
-        print("the list's first question:", {k: sample.get(k) for k in ("status", "resolution", "actual_resolve_time", "resolution_set_time")})
-        full: list[MetaculusQuestion] = []
-        for q in sorted(questions, key=lambda q: q.id_of_question or 0):
-            try:
-                one = await asyncio.to_thread(client.get_question_by_post_id, q.id_of_post)
-                full.append(one if isinstance(one, MetaculusQuestion) else q)
-            except Exception as e:
-                print(f"could not re-read {q.page_url}: {type(e).__name__}")
-        questions = full
+    questions: list[MetaculusQuestion] = []
+    used: list[str] = []
+    for tournament in tournaments:
+        found = await _resolved(client, tournament, opened_after)
+        if found:
+            questions += found
+            used.append(str(tournament))
+        if len(pick(questions, n)) >= n:
+            break
+    tournament = ",".join(used)
     chosen = pick(questions, n)
     from collections import Counter
     print("what was read:", dict(Counter(type(q).__name__ for q in questions)),
@@ -231,8 +244,8 @@ async def _one(bot: FallTemplateBot2026, question: MetaculusQuestion) -> dict[st
     return result
 
 
-def main(tournament: str | int, n: int, profile: str, with_baseline: bool, max_usd: float, out: str) -> int:
-    result = asyncio.run(run(tournament, n, profile, with_baseline, max_usd))
+def main(tournaments: list[str | int], n: int, profile: str, with_baseline: bool, max_usd: float, out: str, opened_after: datetime) -> int:
+    result = asyncio.run(run(tournaments, n, profile, with_baseline, max_usd, opened_after))
     with open(out, "w") as f:
         json.dump(result, f, indent=1, default=str)
     print("\n=== summary ===")

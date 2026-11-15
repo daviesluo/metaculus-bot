@@ -179,7 +179,10 @@ if __name__ == "__main__":
     parser.add_argument("--mode", choices=["tournament", "test_questions", "backtest", "selftest"], default="tournament")
     parser.add_argument("--n", type=int, default=6, help="backtest / test_questions: how many questions")
     parser.add_argument("--profile", default="lean", choices=sorted(cfg.PROFILES), help="backtest: the bot's profile")
-    parser.add_argument("--tournament", default="season", help="backtest: 'season', 'minibench', or a tournament id or slug")
+    parser.add_argument("--tournament", default="season,minibench,cup,summer",
+                        help="backtest: tournaments tried in turn until enough closed questions show their resolution: "
+                             "'season', 'minibench', 'cup', 'summer', or ids or slugs, comma-separated")
+    parser.add_argument("--opened-after", default="2026-08-15", help="backtest: only questions opened after this day (later than the models' training data)")
     parser.add_argument("--no-baseline", action="store_true", help="backtest: skip the template's default bot")
     parser.add_argument("--max-usd", type=float, default=1.0, help="backtest: stop opening questions past this spend")
     parser.add_argument("--out", default="backtest_results.json")
@@ -203,5 +206,10 @@ if __name__ == "__main__":
     import backtest
     from forecasting_tools import MetaculusClient
 
-    ids = {"season": MetaculusClient.CURRENT_AI_COMPETITION_ID, "minibench": MetaculusClient.CURRENT_MINIBENCH_ID}
-    sys.exit(backtest.main(ids.get(args.tournament, args.tournament), args.n, args.profile, not args.no_baseline, args.max_usd, args.out))
+    from datetime import datetime, timezone
+
+    ids = {"season": MetaculusClient.CURRENT_AI_COMPETITION_ID, "minibench": MetaculusClient.CURRENT_MINIBENCH_ID,
+           "cup": MetaculusClient.CURRENT_METACULUS_CUP_ID, "summer": MetaculusClient.FE_SUMMER_2026_ID}
+    wanted = [ids.get(t.strip(), t.strip()) for t in args.tournament.split(",") if t.strip()]
+    opened_after = datetime.fromisoformat(args.opened_after).replace(tzinfo=timezone.utc)
+    sys.exit(backtest.main(wanted, args.n, args.profile, not args.no_baseline, args.max_usd, args.out, opened_after))
