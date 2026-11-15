@@ -8,7 +8,7 @@ Polymarket markets) or Metaculus' bot-testing area, which is not a prize tournam
 | what | result |
 |---|---|
 | Does every kind of question go through, and get posted? | Yes: binary, numeric, discrete, date and multiple choice, on the bot-testing area, with both profiles |
-| Cost a question, `lean` | **$0.014** (three small models, the cheaper web researcher); about **$0.025** with the better web researcher it now uses |
+| Cost a question, `lean` | **$0.024** (three small models and the better web researcher, which is $0.017 of it); $0.014 with the cheaper researcher it first had |
 | Cost a question, `standard` | **$0.19** (five frontier models, after the fixes below; $0.31 before them) |
 | Cost a question, the template's default bot | $0.03 to $0.07 |
 | With a news search, against the market's own price | `lean` was level with it on 5 forecasts (3 questions twice over) |
@@ -72,24 +72,34 @@ call ("wallet balance is depleted"), so ten questions were forecast with no rese
 "Test Bot", mode `test_questions`: the full live path (web research, market search, forecasts, the median, posting).
 The news search was refused throughout (its wallet), so this is the bot on web research alone.
 
-| run | posted | cost a question (list prices / the key's meter) | what it showed |
+| run | posted | cost a question, at list prices | what it showed |
 |---|---|---|---|
-| `lean`, 4 questions | 4 of 4: discrete, numeric, date, binary | $0.0142 / $0.0133 | the path works |
-| `standard` as first built, 5 questions | 5 of 5, multiple choice included | $0.305 / $0.267 | Gemini 4 Carbon spent its whole 12,000-token cap on reasoning and gave no answer in 3 calls of 5 ($0.13 a call); the library passed its reasoning on as an answer and a parser read 0 % from it; Grok 4.7 used 15,000 tokens a call ($0.10) |
-| `standard` rebuilt, 2 questions | 2 of 2 | $0.191 / $0.161 | no empty answer; Gemini within its reasoning cap |
+| `lean` with the cheaper web researcher, 4 questions | 4 of 4: discrete, numeric, date, binary | $0.0142 | the path works |
+| `standard` as first built, 5 questions | 5 of 5, multiple choice included | $0.305 | Gemini 4 Carbon spent its whole 12,000-token cap on reasoning and gave no answer in 3 calls of 5 ($0.13 a call); the library passed its reasoning on as an answer and a parser read 0 % from it; Grok 4.7 used 15,000 tokens a call ($0.10) |
+| `standard` rebuilt, 2 questions | 2 of 2 | $0.191 | no empty answer; Gemini within its reasoning cap |
+| `lean` as launched (the better web researcher), 4 questions | 4 of 4 | $0.0242 | the web researcher is $0.017 of it |
+
+The cost is counted from each call's tokens at OpenRouter's list prices. The key's own meter agrees but runs late: read
+straight after a run it showed 85 to 95 % of the list-price figure, and the rest arrived before the next run (the last
+run: $0.0968 counted, $0.0987 on the meter). The bot's budget guard reads the meter before a run and plans on each
+question's worst case, so a late meter cannot let a run overspend by more than the run before it left uncounted.
 
 Tokens a question, `standard` rebuilt: about 18,000 in and 12,000 out over five forecasters, 500 in and 700 out for
 the web researcher, 17,000 in and 1,600 out for the parser's 10 small calls.
 
 ## 4. What the tests cost
 
-About $2.33 of OpenRouter spend in all (the key's own meter), $1.34 of it the one run of the first `standard`. The
+About $2.49 of OpenRouter spend in all (the key's own meter), $1.5 of it the one run of the first `standard`. The
 news search's wallet was emptied by five date-bounded archive searches; its balance could not be read beforehand.
 
 ## 5. Budget arithmetic
 
-| | questions | `lean` at $0.025 | `standard` at $0.19 |
+| | questions | `lean` at $0.024 | `standard` at $0.19 |
 |---|---|---|---|
-| one MiniBench round | about 60 | $1.50 | $11.40 |
-| the season from mid-November to 6 January (3 to 5 new questions a day) | 160 to 260 | $4 to $6.50 | $30 to $49 |
-| a whole season | 300 to 500 | $7.50 to $12.50 | $57 to $95 |
+| one MiniBench round | about 60 | $1.45 | $11.40 |
+| the season from mid-November to 6 January (3 to 5 new questions a day) | 160 to 260 | $4 to $6 | $30 to $49 |
+| a whole season | 300 to 500 | $7 to $12 | $57 to $95 |
+
+The question counts are estimates (a MiniBench round's from Metaculus' description of it, the season's from its pace so
+far); the first live runs will show the real ones. A news search, when it is funded, adds prompt tokens: about a cent a
+question on `standard`, a tenth of a cent on `lean`.
