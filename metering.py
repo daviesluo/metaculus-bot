@@ -28,6 +28,7 @@ _FALLBACK_PRICES: dict[str, tuple[float, float, float]] = {
     "openai/gpt-6.1-sol": (2e-6, 10e-6, 0.01),
     "anthropic/claude-haiku-5.5": (0.1e-6, 0.5e-6, 0.01),
     "anthropic/claude-sonnet-5.5": (2e-6, 10e-6, 0.01),
+    "anthropic/claude-opus-5.5": (4e-6, 20e-6, 0.01),
     "google/gemini-4-carbon": (2e-6, 10e-6, 0.014),
     "x-ai/grok-4.7": (2e-6, 6e-6, 0.005),
     "perplexity/sonar": (1e-6, 1e-6, 0.005),
@@ -126,13 +127,32 @@ class MeteredLlm(GeneralLlm):
         usage = getattr(response, "usage", None)
         if usage is not None:
             record(self.model, getattr(usage, "prompt_tokens", 0) or 0, getattr(usage, "completion_tokens", 0) or 0)
+        if not has_answer(response):
+            # The library would hand back the model's private reasoning as if it were the answer, and a parser then
+            # reads a number out of half a thought (a test read 0 % that way). No answer is an error.
+            raise RuntimeError(f"{_short(self.model)} gave no answer: its output cap was spent on reasoning")
         return response
 
 
-def llm(model: str, effort: str | None = None, max_tokens: int | None = None, timeout: int = 300, tries: int = 2) -> MeteredLlm:
-    """A metered model. `effort` asks OpenRouter for that reasoning effort; `max_tokens` caps output, reasoning included."""
+def has_answer(response: Any) -> bool:
+    """Whether a chat response carries a written answer (not only reasoning)."""
+    try:
+        content = response.choices[0].message.content
+    except (AttributeError, IndexError, TypeError):
+        return False
+    return isinstance(content, str) and bool(content.strip())
+
+
+def llm(model: str, effort: str | None = None, max_tokens: int | None = None, timeout: int = 300, tries: int = 2,
+        reasoning_tokens: int | None = None) -> MeteredLlm:
+    """
+    A metered model. `max_tokens` caps output, reasoning included. `effort` asks OpenRouter for that reasoning effort;
+    `reasoning_tokens` instead gives the reasoning its own cap, for models that otherwise spend the whole output on it.
+    """
     kwargs: dict[str, Any] = {}
-    if effort:
+    if reasoning_tokens:
+        kwargs["extra_body"] = {"reasoning": {"max_tokens": reasoning_tokens}}
+    elif effort:
         kwargs["extra_body"] = {"reasoning": {"effort": effort}}
     if max_tokens:
         kwargs["max_tokens"] = max_tokens

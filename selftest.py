@@ -99,6 +99,13 @@ def main() -> int:
     cfg.TOURNAMENT_PROFILE.update(cfg_profile)
     ok("mask: no digit of a forecast reaches a public log", mask("Probability: 73% \n on 2026") == "Probability: ##% on ####")
 
+    # An answer is written text: reasoning alone, or nothing, is not one.
+    reply = lambda content: SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=content))])  # noqa: E731
+    ok("answer: text is one; none, blank or no choices is not", metering.has_answer(reply("Probability: 40%")) and not metering.has_answer(reply(None))
+       and not metering.has_answer(reply("  ")) and not metering.has_answer(SimpleNamespace(choices=[])))
+    std_worst = metering.worst_case_question_cost(cfg.PROFILES["standard"])
+    ok("cost: standard worst case under a dollar", 0.2 < std_worst < 1.0)
+
     bad = [name for name, good in checks if not good]
     for name, good in checks:
         print(("ok   " if good else "FAIL ") + name)

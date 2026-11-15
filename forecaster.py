@@ -22,7 +22,6 @@ from datetime import datetime, timedelta, timezone
 from asknews_sdk import AsyncAskNewsSDK
 from forecasting_tools import (
     AskNewsSearcher,
-    BinaryPrediction,
     BinaryQuestion,
     DatePercentile,
     DateQuestion,
@@ -99,7 +98,8 @@ class PrizeBot(FallTemplateBot2026):
         self.profile = cfg.PROFILES[profile_name]
         self.as_of = as_of
         forecasters = self.profile["forecasters"]
-        self._forecasters = [metering.llm(f["model"], f["effort"], f["max_tokens"]) for f in forecasters]
+        # One try each: a forecaster that fails is left out of the median, not paid for twice.
+        self._forecasters = [metering.llm(f["model"], f["effort"], f["max_tokens"], tries=1, reasoning_tokens=f.get("reasoning_tokens")) for f in forecasters]
         self._parser = metering.llm(cfg.PARSER_MODEL, timeout=60)
         self._scout = metering.llm(cfg.SCOUT_MODEL, effort="low", max_tokens=2_000, timeout=60)
         self._web = metering.llm(self.profile["web_researcher"], timeout=120) if self.profile.get("web_researcher") else None
@@ -279,11 +279,8 @@ class PrizeBot(FallTemplateBot2026):
         reasoning = await llm.invoke(prompt)
         value = probability_from_text(reasoning)
         if value is None:
-            parsed: BinaryPrediction = await structure_output(
-                reasoning, BinaryPrediction, model=self._parser, num_validation_samples=self._structure_output_validation_samples,
-                additional_instructions="The text given to you is trying to give a probability forecast for a binary question.\n" + self._create_resolved_question_parsing_message(),
-            )
-            value = parsed.prediction_in_decimal
+            # No guessing a number out of an answer that never stated one: this forecaster is left out of the median.
+            raise ValueError("the forecaster did not end with 'Probability: ZZ%'")
         return ReasonedPrediction(prediction_value=clamp_binary(value), reasoning=reasoning)
 
     async def _run_forecast_on_multiple_choice(self, question: MultipleChoiceQuestion, research: str) -> ReasonedPrediction[PredictedOptionList]:

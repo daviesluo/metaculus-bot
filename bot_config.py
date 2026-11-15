@@ -28,8 +28,8 @@ PARSER_MODEL = "openrouter/openai/gpt-4o-mini"
 SCOUT_MODEL = "openrouter/openai/gpt-6-luna"
 
 
-def _f(model: str, effort: str = "high", max_tokens: int = 12_000) -> dict:
-    return {"model": f"openrouter/{model}", "effort": effort, "max_tokens": max_tokens}
+def _f(model: str, effort: str = "high", max_tokens: int = 12_000, reasoning_tokens: int | None = None) -> dict:
+    return {"model": f"openrouter/{model}", "effort": effort, "max_tokens": max_tokens, "reasoning_tokens": reasoning_tokens}
 
 
 # A profile is what is spent on one question: the web researcher and the forecasters, whose median is the forecast.
@@ -44,14 +44,16 @@ PROFILES: dict[str, dict] = {
             _f("openai/gpt-6-luna"),
         ],
     },
-    # Frontier models from four labs, each at high reasoning.
+    # Frontier models from three labs at high reasoning. Gemini's reasoning has its own cap: at "high" it spent a whole
+    # 12,000-token output on reasoning and gave no answer in 3 calls of 5 (EXPERIMENTS.md); Grok 4.7 at "high" cost five
+    # times what the others did, and is left out.
     "standard": {
         "web_researcher": "openrouter/perplexity/sonar-pro",
         "forecasters": [
             _f("openai/gpt-6.1-sol"),
+            _f("anthropic/claude-opus-5.5"),
+            _f("google/gemini-4-carbon", max_tokens=9_000, reasoning_tokens=5_000),
             _f("anthropic/claude-sonnet-5.5"),
-            _f("google/gemini-4-carbon"),
-            _f("x-ai/grok-4.7"),
             _f("openai/gpt-6.1-terra"),
         ],
     },
