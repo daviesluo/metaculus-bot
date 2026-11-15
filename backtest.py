@@ -164,6 +164,10 @@ async def run(tournament: str | int, n: int, profile: str, with_baseline: bool, 
     api_filter = ApiFilter(allowed_statuses=["resolved"], allowed_tournaments=[tournament], group_question_mode="exclude")
     questions = await client.get_questions_matching_filter(api_filter, num_questions=150, error_if_question_target_missed=False)
     chosen = pick(questions, n)
+    from collections import Counter
+    print("what was read:", dict(Counter(type(q).__name__ for q in questions)),
+          "| with an opening time:", sum(1 for q in questions if q.open_time),
+          "| resolutions:", dict(Counter(str(q.resolution_string)[:20] for q in questions).most_common(8)))
     print(f"closed questions read: {len(questions)}; chosen: {len(chosen)} "
           f"({sum(isinstance(q, BinaryQuestion) for q in chosen)} binary, {sum(isinstance(q, NumericQuestion) for q in chosen)} numeric, "
           f"{sum(isinstance(q, MultipleChoiceQuestion) for q in chosen)} multiple choice)")
