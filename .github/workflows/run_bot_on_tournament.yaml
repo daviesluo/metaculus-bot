@@ -2,11 +2,13 @@ name: Forecast on new AI tournament questions
 
 # A tournament question is open for three hours, so the bot has to look often and without fail. GitHub's own schedule
 # is not that: on this fork it started no run at all for hours. So a run looks for new questions every 15 minutes for
-# about 50 minutes, and then starts the next run itself. The schedule below is only the restart: a scheduled run does
-# nothing while another run is at work, and starts the chain again when none is.
+# about 50 minutes, and the next run is started by this one: early, so that it waits behind this run and takes over
+# even if this run dies. The schedule below is only a second restart: a scheduled run does nothing while another run
+# is at work, and starts the chain again when none is.
 #
-# To stop the bot: set LIVE = False in bot_config.py (the chain ends at its next look), or cancel the run at work (a
-# cancelled run starts no successor) and disable this workflow. To start it: "Run workflow", leaving "chained" false.
+# Each look uses the newest commit of main, so a change to bot_config.py takes effect within 15 minutes.
+# To stop the bot: set LIVE = False in bot_config.py. The run at work ends at its next look, the waiting one at its
+# first, and none follows. To start it again: LIVE = True, then "Run workflow", leaving "chained" false.
 on:
   workflow_dispatch:
     inputs:
@@ -79,6 +81,12 @@ jobs:
       - name: Is the bot launched
         id: live
         run: echo "live=$(uv run python -c 'import bot_config; print(bot_config.LIVE)')" >> "$GITHUB_OUTPUT"
+      - name: Start the next run, to wait behind this one
+        if: steps.live.outputs.live == 'True'
+        continue-on-error: true # the last step tries again
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: sh .github/scripts/next_run.sh
       - name: Run bot
         id: bot
         # Each look prints which questions were forecast and what was spent; never a forecast. The step fails (a red
@@ -86,15 +94,21 @@ jobs:
         env:
           METACULUS_TOKEN: ${{ secrets.METACULUS_TOKEN }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          # The news search: one key, or a client id and secret (used in preference when both are set). With neither
+          # working the bot forecasts on its web research alone, and uses the news search again once one works.
           ASKNEWS_API_KEY: ${{ secrets.ASKNEWS_API_KEY }}
-          LIVE: ${{ steps.live.outputs.live }}
+          ASKNEWS_CLIENT_ID: ${{ secrets.ASKNEWS_CLIENT_ID }}
+          ASKNEWS_SECRET: ${{ secrets.ASKNEWS_SECRET }}
         run: |
           end=$(( $(date +%s) + 3000 ))
           rc=0
           while :; do
-            date -u +"look at %Y-%m-%d %H:%M UTC"
+            git fetch -q origin main && git reset -q --hard FETCH_HEAD || echo "The newest commit could not be fetched: this look uses the last one."
+            live=$(uv run python -c 'import bot_config; print(bot_config.LIVE)')
+            echo "live=$live" >> "$GITHUB_OUTPUT"
+            date -u +"look at %Y-%m-%d %H:%M UTC, commit $(git rev-parse --short HEAD)"
             timeout 45m uv run python run_bot.py --mode tournament || rc=1
-            [ "$LIVE" = "True" ] || break
+            [ "$live" = "True" ] || break
             [ $(( $(date +%s) + 900 )) -lt "$end" ] || break
             sleep 900
           done
@@ -105,17 +119,8 @@ jobs:
         with:
           path: .state
           key: bot-state-${{ github.run_id }}
-      - name: Start the next run
-        if: ${{ !cancelled() && steps.live.outputs.live == 'True' }}
+      - name: Make sure the next run is there
+        if: ${{ !cancelled() && steps.bot.outputs.live == 'True' }}
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          for attempt in 1 2 3 4 5; do
-            if gh workflow run run_bot_on_tournament.yaml --repo "$GITHUB_REPOSITORY" --ref main -f chained=true; then
-              echo "The next run is started."
-              exit 0
-            fi
-            sleep 20
-          done
-          echo "::error::The next run could not be started. Start this workflow by hand (Run workflow)."
-          exit 1
+        run: sh .github/scripts/next_run.sh

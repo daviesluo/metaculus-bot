@@ -53,12 +53,17 @@ Binary, multiple-choice, numeric, date and conditional questions are handled. Th
   the questions left. A question that failed twice is not tried again (and keeps the runs failing until someone looks),
   so a broken question cannot spend all night.
 - A question already forecast is skipped; runs never overlap (one concurrency group). Nothing is posted twice.
-- **How it keeps running.** A run looks every 15 minutes for about 50 minutes and then starts the next run itself;
-  GitHub's schedule is only the restart for a chain that broke (on this fork it started nothing for hours, and a
-  question is gone in three). GitHub sends no email for a run that another run started, so a failure shows on the
-  Actions page alone: **if the newest run there is more than an hour and a half old, the chain has stopped** and the
-  workflow has to be started by hand ("Run workflow").
-- The key's own spending cap is the last line: past it OpenRouter refuses every call.
+- **At the budget's end it stops and says so.** Close to the cap every look puts a warning on the run with what is
+  left; past it the look forecasts nothing, spends nothing, and the run is red with "STOPPED AT THE BUDGET". The cap
+  is raised in OpenRouter's settings, and the bot goes on at its next look.
+- **How it keeps running.** A run looks every 15 minutes for about 50 minutes. Near its start it starts the next run,
+  which waits behind it and takes over when it ends, or dies. GitHub's schedule is only a second restart (on this fork
+  it started nothing for hours, and a question is gone in three). GitHub sends no email for a run that another run
+  started, so a failure shows on the Actions page alone: **if the newest run there is more than an hour and a half
+  old, the chain has stopped** and the workflow has to be started by hand ("Run workflow").
+- **The news search may be absent.** Without a working AskNews credential the bot forecasts on its web research alone
+  (the run's summary counts it under "research that failed"), and uses the news search again at the first look after
+  one works: `ASKNEWS_API_KEY`, or `ASKNEWS_CLIENT_ID` with `ASKNEWS_SECRET`.
 
 ## The stop rule
 
@@ -76,13 +81,14 @@ forecasts" workflow (manual, read-only) scores the bot's own resolved forecasts 
 | what | how |
 |---|---|
 | the bot | the workflow "Forecast on new AI tournament questions": start it once with "Run workflow" and it continues by itself; it forecasts only while `bot_config.LIVE` is `True` |
-| stopping it | `LIVE = False` in `bot_config.py`, or cancel the run at work and disable the workflow |
+| stopping it | `LIVE = False` in `bot_config.py`: every look reads the newest commit, so it stops within 15 minutes and no run follows |
 | a test on closed questions | the workflow "Test Bot", mode `backtest` |
 | the publishing path | "Test Bot", mode `test_questions` (posts on the bot-testing area) |
 | the offline checks | `python run_bot.py --mode selftest` |
 | what the tournaments hold | "Test Bot", mode `status`: questions by status, and how many the bot has forecast |
 
-Secrets (repository secrets, never in a file or a log): `METACULUS_TOKEN`, `OPENROUTER_API_KEY`, `ASKNEWS_API_KEY`.
+Secrets (repository secrets, never in a file or a log): `METACULUS_TOKEN`, `OPENROUTER_API_KEY`, and for the news
+search `ASKNEWS_API_KEY` or `ASKNEWS_CLIENT_ID` with `ASKNEWS_SECRET`.
 The Metaculus Cup workflow of the template is removed: the Cup is a human tournament with no prize for bots, and
 forecasting it would spend the budget for nothing.
 

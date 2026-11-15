@@ -10,6 +10,12 @@ change of the cron line; runs started by hand worked every time. Others report t
 for days. A question is open for three hours, so a schedule that may not fire is no schedule. A run now looks every 15
 minutes for about 50 minutes and starts its successor; the cron line stays as the restart for a broken chain.
 
+Later the same day, after six runs had handed over without a miss and the schedule had still started nothing: the
+successor is started near the start of a run and waits behind it, so a run that dies does not end the chain; each look
+uses the newest commit, so `LIVE = False` stops the bot within 15 minutes; the budget's end is an error on the run and
+its approach a warning; and the news search takes either kind of AskNews credential. No tournament question had been
+open since launch, so none had been forecast.
+
 ## 2026-11-15: no money is kept from the season (the day of launch, before any forecast)
 
 At launch the season was allowed to spend only above $1.50, kept for a MiniBench round, on the reasoning that the

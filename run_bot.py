@@ -85,6 +85,15 @@ def plan_questions(todo: dict[str, list], attempts: dict[str, int], remaining_us
     return taken, left
 
 
+def budget_warning(remaining_usd: float) -> str:
+    """The line a look prints when the key is close to its cap: how much is left and how many questions that is at least."""
+    spendable = max(0.0, remaining_usd - cfg.MIN_KEY_REMAINING_USD)
+    worst = max(metering.worst_case_question_cost(cfg.PROFILES[name]) for name in set(cfg.TOURNAMENT_PROFILE.values()))
+    return (f"::warning::The OpenRouter key is close to its cap: ${remaining_usd:.2f} left, of which ${spendable:.2f} can be spent "
+            f"(at least {int(spendable // worst)} more questions). Past that the bot stops forecasting and says so here. "
+            f"Raise the cap in OpenRouter's settings.")
+
+
 def run_tournament() -> int:
     if not cfg.LIVE:
         print("Not launched: bot_config.LIVE is False. Nothing read, nothing spent.")
@@ -101,7 +110,9 @@ def run_tournament() -> int:
     key = metering.key_status()
     remaining = key["remaining"] if key else None
     if key is None:
-        print("WARNING: the OpenRouter key's meter could not be read; this run is limited by MAX_QUESTIONS_PER_RUN and the key's own cap.")
+        print("::warning::The OpenRouter key's meter could not be read; this look is limited by MAX_QUESTIONS_PER_RUN and the key's own cap.")
+    elif remaining is not None and remaining - cfg.MIN_KEY_REMAINING_USD < cfg.LOW_BUDGET_WARN_USD:
+        print(budget_warning(remaining))
     before_attempts = _load_attempts()
     attempts = dict(before_attempts)
     taken, left = plan_questions(todo, attempts, remaining)
@@ -127,7 +138,7 @@ def run_tournament() -> int:
     try:
         results = asyncio.run(forecast_all())
     except Exception as e:  # said in a line fit for a public log; the traceback could quote a forecast
-        print(f"FAILING THE RUN: {type(e).__name__}: {mask(str(e))}")
+        print(f"::error::The look failed: {type(e).__name__}: {mask(str(e))}")
         return 1
     failed = 0
     after_attempts = dict(attempts)
@@ -161,10 +172,13 @@ def run_tournament() -> int:
         print(f"::warning::{left['held_for_minibench']} season question(s) not forecast: the OpenRouter key holds less than the "
               f"${cfg.SEASON_RESERVE_USD:.2f} kept for MiniBench on top of them. Raise the key's cap to forecast the season.")
     if failed or left["no_budget"] or left["gave_up"]:
+        if failed:
+            print(f"::error::{failed} question(s) could not be forecast at this look (each is tried {MAX_ATTEMPTS} times).")
         if left["no_budget"]:
-            print("FAILING THE RUN: the OpenRouter budget does not cover the questions left. Raise the key's cap.")
+            print(f"::error::STOPPED AT THE BUDGET: {left['no_budget']} open question(s) not forecast. The OpenRouter key has too little "
+                  f"left under its cap to cover them. Nothing was spent on them. Raise the key's cap in OpenRouter's settings.")
         if left["gave_up"]:
-            print(f"FAILING THE RUN: {left['gave_up']} question(s) failed {MAX_ATTEMPTS} times and are no longer tried.")
+            print(f"::error::{left['gave_up']} question(s) failed {MAX_ATTEMPTS} times and are no longer tried.")
         return 1
     return 0
 

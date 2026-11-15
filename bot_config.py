@@ -69,6 +69,9 @@ TOURNAMENT_PROFILE = {"minibench": "lean", "season": "lean"}
 MAX_QUESTIONS_PER_RUN = 25
 # A run stops opening questions when the key has less than this left, and fails so that it is seen.
 MIN_KEY_REMAINING_USD = 0.25
+# Below this much left above that floor, every look puts a warning on the run: about thirty questions' worth on the
+# cheap profile. The cap is raised in OpenRouter's settings; nothing here can raise it.
+LOW_BUDGET_WARN_USD = 0.75
 # Money the season may not touch, kept for MiniBench. Off (0): a question is open for three hours, so the season never
 # has a backlog that could take a MiniBench round's money in one run, and the season is where the prize money is
 # ($50,000 a season against $1,000 a MiniBench round). A season question held back for this is a warning on the run.

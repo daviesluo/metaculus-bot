@@ -16,7 +16,7 @@ def main() -> int:
     from backtest import peer_points, score_binary, score_cdf, score_options, summarise
     from forecaster import clamp_binary, floor_options, probability_from_text
     from forecasting_tools import PredictedOption, PredictedOptionList
-    from run_bot import MAX_ATTEMPTS, mask, plan_questions
+    from run_bot import MAX_ATTEMPTS, budget_warning, mask, plan_questions
 
     checks: list[tuple[str, bool]] = []
     ok = lambda name, cond: checks.append((name, bool(cond)))  # noqa: E731
@@ -103,6 +103,8 @@ def main() -> int:
     ok("plan: no meter, everything within the run's size", sum(len(v) for v in taken.values()) == 5 and left["no_budget"] == 0)
     taken, left = plan_questions({"minibench": [q(i) for i in range(40)], "season": []}, {}, None)
     ok("plan: a run is at most MAX_QUESTIONS_PER_RUN", len(taken["minibench"]) == cfg.MAX_QUESTIONS_PER_RUN and left["run_full"] == 40 - cfg.MAX_QUESTIONS_PER_RUN)
+    line = budget_warning(cfg.MIN_KEY_REMAINING_USD + 3.5 * lean_worst)
+    ok("budget: the warning says how many questions are left at the least", line.startswith("::warning::") and "at least 3 more questions" in line)
     cfg.TOURNAMENT_PROFILE.update(cfg_profile)
     ok("mask: no digit of a forecast reaches a public log", mask("Probability: 73% \n on 2026") == "Probability: ##% on ####")
 
