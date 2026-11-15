@@ -1,19 +1,62 @@
 name: Forecast on new AI tournament questions
 
+# A tournament question is open for three hours, so the bot has to look often and without fail. GitHub's own schedule
+# is not that: on this fork it started no run at all for hours. So a run looks for new questions every 15 minutes for
+# about 50 minutes, and then starts the next run itself. The schedule below is only the restart: a scheduled run does
+# nothing while another run is at work, and starts the chain again when none is.
+#
+# To stop the bot: set LIVE = False in bot_config.py (the chain ends at its next look), or cancel the run at work (a
+# cancelled run starts no successor) and disable this workflow. To start it: "Run workflow", leaving "chained" false.
 on:
   workflow_dispatch:
+    inputs:
+      chained:
+        description: "Set by the run before this one. Leave it false when starting by hand."
+        default: "false"
   schedule:
-    - cron: "5,25,45 * * * *" # every 20 minutes, off the hour. A question already forecast is skipped.
+    - cron: "5,25,45 * * * *"
 
-# One run at a time: a run that overruns makes the next one wait, never run beside it.
-concurrency:
-  group: ${{ github.workflow }}
-  cancel-in-progress: false
+permissions:
+  contents: read
+  actions: write # to start the next run, and to see whether another one is at work
 
 jobs:
-  forecast_job:
+  # A run started by the schedule or by hand goes ahead only when no other run of this workflow is at work.
+  gate:
     runs-on: ubuntu-latest
-    timeout-minutes: 55
+    timeout-minutes: 5
+    outputs:
+      go: ${{ steps.check.outputs.go }}
+    steps:
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHAINED: ${{ inputs.chained }}
+        run: |
+          if [ "$CHAINED" = "true" ]; then
+            echo "Started by the run before it."
+            echo "go=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          others=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/run_bot_on_tournament.yaml/runs?per_page=30" \
+            --jq "[.workflow_runs[] | select(.status != \"completed\" and .id != $GITHUB_RUN_ID)] | length") || others="unknown"
+          if [ "$others" = "0" ]; then
+            echo "No other run is at work: this one starts the chain."
+            echo "go=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Other runs at work: $others. Nothing to do."
+            echo "go=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  forecast_job:
+    needs: gate
+    if: needs.gate.outputs.go == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 130
+    # One at a time: the next run waits here until this one has finished.
+    concurrency:
+      group: forecast
+      cancel-in-progress: false
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -33,18 +76,46 @@ jobs:
           path: .state
           key: bot-state-${{ github.run_id }}
           restore-keys: bot-state-
+      - name: Is the bot launched
+        id: live
+        run: echo "live=$(uv run python -c 'import bot_config; print(bot_config.LIVE)')" >> "$GITHUB_OUTPUT"
       - name: Run bot
         id: bot
-        # Prints which questions were forecast and what was spent; never a forecast. Exits non-zero (a failed run,
-        # which GitHub reports) when a question failed or the budget does not cover the questions left.
-        run: uv run python run_bot.py --mode tournament
+        # Each look prints which questions were forecast and what was spent; never a forecast. The step fails (a red
+        # run) when a question failed or the budget does not cover the questions left, after the last look.
         env:
           METACULUS_TOKEN: ${{ secrets.METACULUS_TOKEN }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           ASKNEWS_API_KEY: ${{ secrets.ASKNEWS_API_KEY }}
+          LIVE: ${{ steps.live.outputs.live }}
+        run: |
+          end=$(( $(date +%s) + 3000 ))
+          rc=0
+          while :; do
+            date -u +"look at %Y-%m-%d %H:%M UTC"
+            timeout 45m uv run python run_bot.py --mode tournament || rc=1
+            [ "$LIVE" = "True" ] || break
+            [ $(( $(date +%s) + 900 )) -lt "$end" ] || break
+            sleep 900
+          done
+          exit $rc
       - name: Save the attempt record
         if: always() && steps.bot.outputs.state_changed == 'true'
         uses: actions/cache/save@v4
         with:
           path: .state
           key: bot-state-${{ github.run_id }}
+      - name: Start the next run
+        if: ${{ !cancelled() && steps.live.outputs.live == 'True' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for attempt in 1 2 3 4 5; do
+            if gh workflow run run_bot_on_tournament.yaml --repo "$GITHUB_REPOSITORY" --ref main -f chained=true; then
+              echo "The next run is started."
+              exit 0
+            fi
+            sleep 20
+          done
+          echo "::error::The next run could not be started. Start this workflow by hand (Run workflow)."
+          exit 1

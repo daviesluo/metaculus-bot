@@ -3,6 +3,13 @@
 Every change to how the bot forecasts, newest first, with its reason. The tournament's rule: a change is made from
 general reasoning or from the results of CLOSED questions, never after looking at the bot's forecasts on open questions.
 
+## 2026-11-15: the bot keeps itself running (how it runs, not how it forecasts)
+
+GitHub started no scheduled run in the two and a half hours after the workflow was pushed, through an enable call and a
+change of the cron line; runs started by hand worked every time. Others report the same on new repositories and forks,
+for days. A question is open for three hours, so a schedule that may not fire is no schedule. A run now looks every 15
+minutes for about 50 minutes and starts its successor; the cron line stays as the restart for a broken chain.
+
 ## 2026-11-15: no money is kept from the season (the day of launch, before any forecast)
 
 At launch the season was allowed to spend only above $1.50, kept for a MiniBench round, on the reasoning that the

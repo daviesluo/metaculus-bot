@@ -5,7 +5,7 @@ says what this fork adds and how it is run.
 
 ## What it does
 
-Every 20 minutes a GitHub Action looks for new questions in MiniBench and in the season's bot tournament (a question is
+Every 15 minutes a GitHub Action looks for new questions in MiniBench and in the season's bot tournament (a question is
 open for three hours), forecasts each once, and posts the forecast with its reasoning (a private comment) to Metaculus. For each question it:
 
 1. **researches** it twice over: a news search (AskNews) and a web-searching model, and looks for prediction markets
@@ -49,10 +49,15 @@ Binary, multiple-choice, numeric, date and conditional questions are handled. Th
   question that the OpenRouter key's remaining budget does not cover, and at most 25 questions.
 - MiniBench comes first within a run. Money can be kept from the season for MiniBench (`SEASON_RESERVE_USD`, off at
   present); season questions held back for that show as a warning on the run, not a failure.
-- A run **fails**, which GitHub reports to the repository's owner, when a question could not be forecast or the budget
-  does not cover the questions left. A question that failed twice is not tried again (and keeps the run failing until
-  someone looks), so a broken question cannot spend all night.
+- A run **fails** (a red run on the Actions page) when a question could not be forecast or the budget does not cover
+  the questions left. A question that failed twice is not tried again (and keeps the runs failing until someone looks),
+  so a broken question cannot spend all night.
 - A question already forecast is skipped; runs never overlap (one concurrency group). Nothing is posted twice.
+- **How it keeps running.** A run looks every 15 minutes for about 50 minutes and then starts the next run itself;
+  GitHub's schedule is only the restart for a chain that broke (on this fork it started nothing for hours, and a
+  question is gone in three). GitHub sends no email for a run that another run started, so a failure shows on the
+  Actions page alone: **if the newest run there is more than an hour and a half old, the chain has stopped** and the
+  workflow has to be started by hand ("Run workflow").
 - The key's own spending cap is the last line: past it OpenRouter refuses every call.
 
 ## The stop rule
@@ -70,7 +75,8 @@ forecasts" workflow (manual, read-only) scores the bot's own resolved forecasts 
 
 | what | how |
 |---|---|
-| the schedule | the workflow "Forecast on new AI tournament questions"; it forecasts only while `bot_config.LIVE` is `True` |
+| the bot | the workflow "Forecast on new AI tournament questions": start it once with "Run workflow" and it continues by itself; it forecasts only while `bot_config.LIVE` is `True` |
+| stopping it | `LIVE = False` in `bot_config.py`, or cancel the run at work and disable the workflow |
 | a test on closed questions | the workflow "Test Bot", mode `backtest` |
 | the publishing path | "Test Bot", mode `test_questions` (posts on the bot-testing area) |
 | the offline checks | `python run_bot.py --mode selftest` |
