@@ -6,9 +6,9 @@ never after looking at the bot's forecasts on open questions. Every change is re
 """
 from __future__ import annotations
 
-# The schedule forecasts on the tournaments only while this is True. It is switched on by a commit, once the tests on
-# closed questions in EXPERIMENTS.md are in. Off, the scheduled run reports "not launched" and spends nothing.
-LIVE = False
+# The schedule forecasts on the tournaments only while this is True. Off, the scheduled run reports "not launched" and
+# spends nothing. On since 2026-11-15 (DECISIONS.md); the stop rule in README.md is what switches it off.
+LIVE = True
 
 # Forecasts never go outside this band on a binary question, nor under the floor on any option of a multiple choice
 # question. A log score punishes a confident miss far more than it rewards the last point of confidence: 99 % against

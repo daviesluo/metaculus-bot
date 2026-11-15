@@ -3,6 +3,23 @@
 Every change to how the bot forecasts, newest first, with its reason. The tournament's rule: a change is made from
 general reasoning or from the results of CLOSED questions, never after looking at the bot's forecasts on open questions.
 
+## 2026-11-15: launched
+
+`LIVE = True`. On what evidence (EXPERIMENTS.md):
+
+- every kind of question went through the live path and was posted on the bot-testing area, with the profile as
+  launched (4 of 4, $0.024 a question);
+- with a news search the forecasts were level with a real-money market's own price on resolved questions (5 forecasts:
+  little, and all there is);
+- without research they were far worse, and the bot no longer forecasts without research.
+
+What is not known at launch: whether these forecasts beat the other bots'. The tests could not show it (no Metaculus
+resolution is shown to this account; the news search ran out of money after five searches). The stop rule in README.md
+is the answer to that: two MiniBench rounds below the middle of the table, read from final results, and it is off.
+
+Launched on `lean` for both tournaments, MiniBench first, the season only above MiniBench's reserve. From here on, no
+change is made from a forecast on an open question.
+
 ## 2026-11-15: after the tests on closed questions and the bot-testing area (before launch)
 
 From EXPERIMENTS.md §2 and §3. No tournament question had been forecast.
