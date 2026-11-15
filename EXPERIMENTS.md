@@ -96,10 +96,11 @@ news search's wallet was emptied by five date-bounded archive searches; its bala
 
 | | questions | `lean` at $0.024 | `standard` at $0.19 |
 |---|---|---|---|
-| one MiniBench round | about 60 | $1.45 | $11.40 |
-| the season from mid-November to 6 January (3 to 5 new questions a day) | 160 to 260 | $4 to $6 | $30 to $49 |
-| a whole season | 300 to 500 | $7 to $12 | $57 to $95 |
+| one MiniBench round | 60 | $1.45 | $11.40 |
+| the season from 15 November to 6 January | about 200 | $4.80 | $38 |
+| a whole season | about 380 | $9 | $72 |
 
-The question counts are estimates (a MiniBench round's from Metaculus' description of it, the season's from its pace so
-far); the first live runs will show the real ones. A news search, when it is funded, adds prompt tokens: about a cent a
-question on `standard`, a tenth of a cent on `lean`.
+The counts are Metaculus' own, read with `--mode status` on 2026-11-15: the MiniBench round of 16 November holds 60
+questions, all opening by 18 November; the season had opened 182 questions in its first 48 days (3.8 a day), each open
+for exactly three hours, a batch every three hours, every day of the week, and runs 52 more days. A news search, when
+it is funded, adds prompt tokens: about a cent a question on `standard`, a tenth of a cent on `lean`.

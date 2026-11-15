@@ -60,15 +60,16 @@ PROFILES: dict[str, dict] = {
     },
 }
 
-# Which profile each tournament gets. MiniBench is a fresh contest every two weeks; the season was joined half way,
-# where a prize is out of reach (a prize is the square of the summed score), so it gets the cheap profile.
+# Which profile each tournament gets. Both the cheap one while the budget covers nothing else: `standard` costs eight
+# times as much a question (EXPERIMENTS.md §5 has the arithmetic). Switching either to `standard` when the budget is
+# there needs no new evidence: frontier models at high reasoning are the first of Metaculus' own findings.
 TOURNAMENT_PROFILE = {"minibench": "lean", "season": "lean"}
 
 # Budget guards. The OpenRouter key has its own hard cap; these keep a run from reaching it unnoticed.
 MAX_QUESTIONS_PER_RUN = 25
 # A run stops opening questions when the key has less than this left, and fails so that it is seen.
 MIN_KEY_REMAINING_USD = 0.25
-# The season is forecast only while the key holds more than this as well: about what one MiniBench round costs on its
-# profile (60 questions). MiniBench is where a prize can be won, so the season never spends its money. A season
-# question held back for this is a warning on the run, not a failure.
-SEASON_RESERVE_USD = 1.50
+# Money the season may not touch, kept for MiniBench. Off (0): a question is open for three hours, so the season never
+# has a backlog that could take a MiniBench round's money in one run, and the season is where the prize money is
+# ($50,000 a season against $1,000 a MiniBench round). A season question held back for this is a warning on the run.
+SEASON_RESERVE_USD = 0.0

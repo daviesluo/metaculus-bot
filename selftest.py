@@ -93,7 +93,9 @@ def main() -> int:
        [x.id_of_question for x in taken["minibench"]] == [1] and taken["season"] == []
        and left == {"gave_up": 1, "run_full": 0, "no_budget": 2, "held_for_minibench": 0})
     todo = {"minibench": [q(1), q(2)], "season": [q(3), q(4), q(5)]}
+    reserve, cfg.SEASON_RESERVE_USD = cfg.SEASON_RESERVE_USD, 1.5
     taken, left = plan_questions(todo, {}, cfg.MIN_KEY_REMAINING_USD + cfg.SEASON_RESERVE_USD + 4.5 * lean_worst)
+    cfg.SEASON_RESERVE_USD = reserve
     ok("plan: the season stops at what is kept for MiniBench, as a hold and not a shortage",
        len(taken["minibench"]) == 2 and [x.id_of_question for x in taken["season"]] == [3, 4]
        and left == {"gave_up": 0, "run_full": 0, "no_budget": 0, "held_for_minibench": 1})

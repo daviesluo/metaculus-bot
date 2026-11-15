@@ -3,6 +3,20 @@
 Every change to how the bot forecasts, newest first, with its reason. The tournament's rule: a change is made from
 general reasoning or from the results of CLOSED questions, never after looking at the bot's forecasts on open questions.
 
+## 2026-11-15: no money is kept from the season (the day of launch, before any forecast)
+
+At launch the season was allowed to spend only above $1.50, kept for a MiniBench round, on the reasoning that the
+season's backlog would otherwise take a round's money and that a season joined half way cannot win. The first count of
+the tournaments (`--mode status`) showed both wrong:
+
+- every season question is open for exactly three hours, one batch every three hours, every day: there is no backlog,
+  and the season spends about four questions a day;
+- the money is in the season: $50,000 against $1,000 a MiniBench round. A prize is the square of the summed score, so a
+  bot that plays the second half earns about a quarter of what it would have earned over the whole season: less, not
+  nothing.
+
+`SEASON_RESERVE_USD` is 0. No forecast had been made.
+
 ## 2026-11-15: launched
 
 `LIVE = True`. On what evidence (EXPERIMENTS.md):
@@ -17,7 +31,7 @@ What is not known at launch: whether these forecasts beat the other bots'. The t
 resolution is shown to this account; the news search ran out of money after five searches). The stop rule in README.md
 is the answer to that: two MiniBench rounds below the middle of the table, read from final results, and it is off.
 
-Launched on `lean` for both tournaments, MiniBench first, the season only above MiniBench's reserve. From here on, no
+Launched on `lean` for both tournaments, MiniBench first. From here on, no
 change is made from a forecast on an open question.
 
 ## 2026-11-15: after the tests on closed questions and the bot-testing area (before launch)
@@ -37,9 +51,6 @@ From EXPERIMENTS.md §2 and §3. No tournament question had been forecast.
 - **The standard profile rebuilt**: Gemini 4 Carbon with a reasoning cap of its own (it spent a 12,000-token output on
   reasoning and answered nothing in 3 calls of 5); Grok 4.7 out (five times the others' cost at high reasoning), Opus
   5.5 in. $0.19 a question, from $0.31.
-- **MiniBench's money is kept from the season.** A MiniBench round is a fresh contest; the season was joined half way,
-  where a prize (the square of the summed score) is out of reach. The season is forecast only while the key holds more
-  than one MiniBench round's cost (`SEASON_RESERVE_USD`, $1.50 at `lean`).
 - **Both tournaments on `lean` for now**: the budget in hand covers nothing else. `standard` on MiniBench is the plan
   once the budget allows; that switch needs no new evidence (frontier models are the first of Metaculus' own findings).
 
