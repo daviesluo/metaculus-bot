@@ -28,7 +28,7 @@ from forecasting_tools import (
 
 import main as template_module
 import metering
-from forecaster import PrizeBot
+from forecaster import NO_RESEARCH, PrizeBot
 from main import FallTemplateBot2026
 
 logger = logging.getLogger(__name__)
@@ -246,7 +246,7 @@ async def _resolved(client: MetaculusClient, tournament: str | int, opened_after
     return shown
 
 
-async def run(tournaments: list[str | int], n: int, profile: str, with_baseline: bool, max_usd: float, opened_after: datetime) -> dict[str, Any]:
+async def run(tournaments: list[str | int], n: int, profile: str, with_baseline: bool, max_usd: float, opened_after: datetime, blind: bool = False) -> dict[str, Any]:
     """
     `tournaments` are tried in turn until `n` usable questions are found: a running bot tournament hides its
     resolutions, so the test falls back on tournaments that show them. `opened_after` keeps the questions later than the
@@ -294,8 +294,16 @@ async def run(tournaments: list[str | int], n: int, profile: str, with_baseline:
             row["question"] = q.question_text
             row["market"] = {"forecast": market_price, **score_binary(market_price, bool(q.typed_resolution))}
         mine = PrizeBot(profile_name=profile, as_of=as_of, shared_research=shared, publish_reports_to_metaculus=False, skip_previously_forecasted_questions=False)
+        key = str(q.id_of_question or q.page_url)
+        if key not in shared:
+            await mine.run_research(q)
+        row["news_chars"] = 0 if shared.get(key) == NO_RESEARCH else len(shared.get(key, ""))
+        if not row["news_chars"] and not blind:
+            row["skipped"] = "no news as of that day: a blind forecast is not what the bot does"
+            rows.append(row)
+            print(json.dumps(row, default=str))
+            continue
         row["prize"] = await _one(mine, q)
-        row["news_chars"] = len(shared.get(str(q.id_of_question or q.page_url), ""))
         if with_baseline:
             _Frozen.at = as_of
             template_module.datetime = _Frozen  # the template's prompts read the date here
@@ -333,8 +341,8 @@ async def _one(bot: FallTemplateBot2026, question: MetaculusQuestion) -> dict[st
     return result
 
 
-def main(tournaments: list[str | int], n: int, profile: str, with_baseline: bool, max_usd: float, out: str, opened_after: datetime) -> int:
-    result = asyncio.run(run(tournaments, n, profile, with_baseline, max_usd, opened_after))
+def main(tournaments: list[str | int], n: int, profile: str, with_baseline: bool, max_usd: float, out: str, opened_after: datetime, blind: bool = False) -> int:
+    result = asyncio.run(run(tournaments, n, profile, with_baseline, max_usd, opened_after, blind))
     with open(out, "w") as f:
         json.dump(result, f, indent=1, default=str)
     print("\n=== summary ===")

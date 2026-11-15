@@ -156,21 +156,33 @@ def run_tournament() -> int:
     return 0
 
 
-def run_test_questions(limit: int) -> int:
+def run_test_questions(limit: int, profile: str = "lean") -> int:
     check_environment(strict=True)
     from forecasting_tools import ForecastReport, MetaculusClient
 
     from forecaster import PrizeBot
 
     client = MetaculusClient()
-    questions = client.get_all_open_questions_from_tournament("bot-testing-area")[:limit]
+    every = client.get_all_open_questions_from_tournament("bot-testing-area")
+    kinds: dict[str, list] = {}
+    for q in sorted(every, key=lambda q: q.id_of_question or 0):
+        kinds.setdefault(type(q).__name__, []).append(q)
+    questions = [q for i in range(limit) for group in kinds.values() if i < len(group) for q in [group[i]]][:limit]  # the kinds in turn
+    key_before = metering.key_status()
     start = metering.snapshot()
-    bot = PrizeBot(profile_name="lean", publish_reports_to_metaculus=True, skip_previously_forecasted_questions=False)
+    bot = PrizeBot(profile_name=profile, publish_reports_to_metaculus=True, skip_previously_forecasted_questions=False, extra_metadata_in_explanation=True)
     reports = asyncio.run(bot.forecast_questions(questions, return_exceptions=True))
     for q, r in zip(questions, reports):
         print(("ok   " if isinstance(r, ForecastReport) else f"FAIL {type(r).__name__}: {str(r)[:300]} ") + f"{type(q).__name__} {q.page_url}")
     spent, by_model = metering.spent_since(start)
-    print(f"spent at list prices: ${spent:.4f}; by model: {json.dumps(by_model)}")
+    done = sum(isinstance(r, ForecastReport) for r in reports)
+    print(f"profile {profile}: {done} of {len(questions)} posted; anchored on a market: {bot.anchored}; research that failed, by source: {bot.gaps}")
+    print(f"spent at list prices: ${spent:.4f}" + (f" (${spent / len(questions):.4f} a question)" if questions else ""))
+    for m in by_model:
+        print(f"  {m['model']}: {m['calls']} calls, {m['prompt_tokens']} in, {m['completion_tokens']} out, ${m['usd']}")
+    key_after = metering.key_status()
+    if key_before and key_after and key_before["usage"] is not None and key_after["usage"] is not None:
+        print(f"OpenRouter key's meter: ${key_after['usage'] - key_before['usage']:.4f} this run; remaining {key_after['remaining']}")
     return 0 if reports and all(isinstance(r, ForecastReport) for r in reports) else 1
 
 
@@ -186,6 +198,7 @@ if __name__ == "__main__":
     parser.add_argument("--opened-after", default="2026-08-15", help="backtest: only questions opened after this day (later than the models' training data)")
     parser.add_argument("--no-baseline", action="store_true", help="backtest: skip the template's default bot")
     parser.add_argument("--max-usd", type=float, default=1.0, help="backtest: stop opening questions past this spend")
+    parser.add_argument("--blind", action="store_true", help="backtest: also forecast questions for which no news was found (the bot itself never does)")
     parser.add_argument("--out", default="backtest_results.json")
     args = parser.parse_args()
 
@@ -202,7 +215,7 @@ if __name__ == "__main__":
             logging.getLogger(name).setLevel(logging.CRITICAL)
         sys.exit(run_tournament())
     if args.mode == "test_questions":
-        sys.exit(run_test_questions(args.n))
+        sys.exit(run_test_questions(args.n, args.profile))
     check_environment(strict=True)
     import backtest
     from forecasting_tools import MetaculusClient
@@ -213,4 +226,4 @@ if __name__ == "__main__":
            "cup": MetaculusClient.CURRENT_METACULUS_CUP_ID, "summer": MetaculusClient.FE_SUMMER_2026_ID}
     wanted = [ids.get(t.strip(), t.strip()) for t in args.tournament.split(",") if t.strip()]
     opened_after = datetime.fromisoformat(args.opened_after).replace(tzinfo=timezone.utc)
-    sys.exit(backtest.main(wanted, args.n, args.profile, not args.no_baseline, args.max_usd, args.out, opened_after))
+    sys.exit(backtest.main(wanted, args.n, args.profile, not args.no_baseline, args.max_usd, args.out, opened_after, args.blind))

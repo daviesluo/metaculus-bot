@@ -54,7 +54,8 @@ How you work:
 - Then the news: only what actually moves the odds, and by how much. Old news is already in the base rate.
 - If a prediction market asks exactly this question, it is the best single forecast you have: stay close to it unless
   you can name what it is missing. A market about something merely related is weak evidence.
-- If the research is thin or contradictory, say so and stay nearer the base rate.
+- If the research is thin or contradictory, say so and stay nearer the base rate. If it tells you nothing about the
+  current state of the thing asked, you are guessing: do not answer below 10% or above 90%.
 - Never be more confident than your evidence. Being wrong at 98% costs far more than being right at 98% earns.
 """
 
@@ -86,7 +87,13 @@ def floor_options(option_list: PredictedOptionList) -> PredictedOptionList:
     ])
 
 
+NO_RESEARCH = "No research could be gathered."
+
+
 class PrizeBot(FallTemplateBot2026):
+    # Set when the news search refuses the key or its wallet is empty: the rest of the run does without it.
+    _news_off = False
+
     def __init__(self, *, profile_name: str, as_of: datetime | None = None, shared_research: dict[str, str] | None = None, **kwargs) -> None:
         self.profile_name = profile_name
         self.profile = cfg.PROFILES[profile_name]
@@ -142,18 +149,27 @@ class PrizeBot(FallTemplateBot2026):
                 web, market_text = await asyncio.gather(self._web_research(question), self._market_research(question))
                 if web:
                     parts.append("## Web research\n" + web)
+                if not parts:
+                    # A forecast made blind lost 64 points a question to the market's price in the tests on closed
+                    # questions (EXPERIMENTS.md): no forecast is better. The run reports the failure and tries again.
+                    raise RuntimeError("no research: the news search and the web research both came back empty")
                 parts.append("## Prediction markets\n" + market_text)
-            research = "\n\n".join(parts) if parts else "No research could be gathered. Rely on base rates."
+            research = "\n\n".join(parts) if parts else NO_RESEARCH
             self._research[key] = research
             return research
 
     async def _news(self, question: MetaculusQuestion) -> str:
+        if PrizeBot._news_off:
+            self.gaps["news"] += 1
+            return ""
         try:
             if self.as_of is None:
                 return await AskNewsSearcher().get_formatted_news_async(question.question_text)
             return await self._news_before(question.question_text, self.as_of)
         except Exception as e:
             self.gaps["news"] += 1
+            if re.search(r"\b40[123]\d*\b|wallet|unauthori|forbidden|credential", str(e), re.I):
+                PrizeBot._news_off = True  # no key, or nothing left to pay with: do not ask again this run
             logger.warning(f"News search failed for {question.page_url} ({type(e).__name__}: {str(e)[:120]})")
             return ""
 
