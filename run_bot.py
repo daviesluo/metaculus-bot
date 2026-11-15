@@ -119,7 +119,11 @@ def run_tournament() -> int:
             results[name + "_anchored"] = [bot.anchored, dict(bot.gaps)]
         return results
 
-    results = asyncio.run(forecast_all())
+    try:
+        results = asyncio.run(forecast_all())
+    except Exception as e:  # said in a line fit for a public log; the traceback could quote a forecast
+        print(f"FAILING THE RUN: {type(e).__name__}: {mask(str(e))}")
+        return 1
     failed = 0
     after_attempts = dict(attempts)
     print("=" * 80)

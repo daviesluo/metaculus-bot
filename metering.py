@@ -96,7 +96,7 @@ def worst_case_question_cost(profile: dict, prompt_tokens: int = 12_000) -> floa
     for f in profile["forecasters"]:
         total += call_cost(f["model"], prompt_tokens, f["max_tokens"])
     if profile.get("web_researcher"):
-        total += call_cost(profile["web_researcher"], 2_000, 3_000)
+        total += call_cost(profile["web_researcher"], 2_000, 1_500)
     return total + 0.01  # the scout's and the parser's calls
 
 

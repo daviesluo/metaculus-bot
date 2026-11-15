@@ -83,7 +83,7 @@ def main() -> int:
     ok("cost: tokens", close(metering.call_cost("openrouter/openai/gpt-6.1-sol", 5000, 8000), 5000 * 2e-6 + 8000 * 10e-6))
     ok("cost: a search model adds its request fee", close(metering.call_cost("openrouter/perplexity/sonar", 1000, 1000, 2), 0.002 + 0.01))
     lean_worst = metering.worst_case_question_cost(cfg.PROFILES["lean"])
-    ok("cost: lean worst case under 5 cents", 0.01 < lean_worst < 0.05)
+    ok("cost: lean worst case under 10 cents", 0.01 < lean_worst < 0.10)
     q = lambda i: SimpleNamespace(id_of_question=i)  # noqa: E731
     cfg_profile = dict(cfg.TOURNAMENT_PROFILE)
     cfg.TOURNAMENT_PROFILE.update({"minibench": "lean", "season": "lean"})

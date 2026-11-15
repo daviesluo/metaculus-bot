@@ -35,9 +35,10 @@ def _f(model: str, effort: str = "high", max_tokens: int = 12_000, reasoning_tok
 # A profile is what is spent on one question: the web researcher and the forecasters, whose median is the forecast.
 # `max_tokens` caps a call's output, reasoning included, so the worst cost of a question is known before it is asked.
 PROFILES: dict[str, dict] = {
-    # A few cents a question: for a small budget, and for the season the bot joined half way.
+    # A few cents a question: for a small budget, and for the season the bot joined half way. The web researcher is the
+    # better one all the same: with no news search it is the only research there is, and a forecast is as good as it.
     "lean": {
-        "web_researcher": "openrouter/perplexity/sonar",
+        "web_researcher": "openrouter/perplexity/sonar-pro",
         "forecasters": [
             _f("openai/gpt-6-luna"),
             _f("anthropic/claude-haiku-5.5"),
