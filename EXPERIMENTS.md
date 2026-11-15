@@ -104,3 +104,16 @@ The counts are Metaculus' own, read with `--mode status` on 2026-11-15: the Mini
 questions, all opening by 18 November; the season had opened 182 questions in its first 48 days (3.8 a day), each open
 for exactly three hours, a batch every three hours, every day of the week, and runs 52 more days. A news search, when
 it is funded, adds prompt tokens: about a cent a question on `standard`, a tenth of a cent on `lean`.
+
+## 6. Live, the first day (counts and cost only)
+
+No forecast on an open question is read or shown, here or anywhere: only how many there were and what they cost.
+
+- 2026-11-15, 08:46 to 15:42 UTC: 29 looks, about 15 minutes apart, by nine runs that each started the next. No run
+  failed.
+- One season question opened in that time (15:00 UTC). The look at 15:10 forecast it and posted it; the two looks after
+  found it already forecast and left it. **$0.0218** at list prices, $0.0226 on the key's meter. The news search was
+  refused (its wallet); the web research and the market search answered; no market matched.
+- GitHub's schedule started its first run at 15:35 UTC, seven hours after the cron line was last changed. It found two
+  runs at work and did nothing, as built.
+- MiniBench's round opens on 16 November at 00:00 UTC: 60 questions, none listed yet.
