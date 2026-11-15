@@ -18,8 +18,8 @@ on:
         description: "backtest: the bot's profile (lean or standard)"
         default: "lean"
       tournament:
-        description: "backtest: tournaments tried in turn (season, minibench, cup, summer, or ids), comma-separated"
-        default: "season,minibench,cup,summer"
+        description: "backtest: polymarket (resolved markets), or Metaculus tournaments tried in turn (season, minibench, cup, summer, or ids)"
+        default: "polymarket"
       baseline:
         description: "backtest: also run the template's default bot (true or false)"
         default: "true"

@@ -12,9 +12,11 @@ import asyncio
 import json
 import logging
 import math
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+import requests
 from forecasting_tools import (
     ApiFilter,
     BinaryQuestion,
@@ -159,6 +161,79 @@ def _baseline_bot(shared: dict[str, str]) -> TemplateBaseline:
     )
 
 
+# ---------------------------------------------------------------------- closed questions from Polymarket
+
+_PM_SKIP = re.compile(r"\bvs\.?\b|win on 20|up or down|price of|above \$|below \$|o/u|spread:|\bset \d|map \d|game \d", re.I)
+_UA = {"User-Agent": "forecasting-bot/1.0", "Accept": "application/json"}
+
+
+def polymarket_question(market: dict, as_of: datetime, price: float) -> BinaryQuestion | None:
+    """A resolved Polymarket Yes/No market as a binary question that opened an hour before `as_of`."""
+    try:
+        outcomes = [str(o).lower() for o in json.loads(market.get("outcomes") or "[]")]
+        final = [float(x) for x in json.loads(market.get("outcomePrices") or "[]")]
+    except (ValueError, TypeError):
+        return None
+    if outcomes != ["yes", "no"] or sorted(final) != [0.0, 1.0] or _PM_SKIP.search(market.get("question") or ""):
+        return None
+    event = (market.get("events") or [{}])[0]
+    q = BinaryQuestion(
+        question_text=market["question"], id_of_question=int(market["id"]), id_of_post=int(market["id"]),
+        page_url=f"https://polymarket.com/event/{event.get('slug') or market.get('slug')}",
+        background_info=f"This is a question from the prediction market Polymarket. The market is scheduled to end on {str(market.get('endDate'))[:10]}.",
+        resolution_criteria=market.get("description") or "", fine_print="",
+        open_time=as_of - timedelta(hours=1), resolution_string="yes" if final[0] == 1.0 else "no",
+    )
+    q.community_prediction_at_access_time = price  # the market's own price at `as_of`: the benchmark, never shown to a bot
+    return q
+
+
+def polymarket_closed(n: int, ended_after: datetime, ended_before: datetime, days_before_end: int = 7) -> list[BinaryQuestion]:
+    """
+    Resolved, well-traded Yes/No markets that ended in the window, one an event, the most traded first, each as of
+    `days_before_end` days before its end and only when its price then stood between 8 % and 92 % (still in doubt).
+    Keyless, public data.
+    """
+    chosen: list[BinaryQuestion] = []
+    events: set[str] = set()
+    for offset in range(0, 600, 100):
+        r = requests.get("https://gamma-api.polymarket.com/markets", headers=_UA, timeout=30, params={
+            "closed": "true", "end_date_min": ended_after.strftime("%Y-%m-%dT%H:%M:%SZ"), "end_date_max": ended_before.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "volume_num_min": 100000, "order": "volumeNum", "ascending": "false", "limit": 100, "offset": offset})
+        r.raise_for_status()
+        page = r.json()
+        for market in page:
+            event = str((market.get("events") or [{}])[0].get("slug") or market.get("slug"))
+            if event in events:
+                continue
+            try:
+                end = datetime.fromisoformat(str(market["endDate"]).replace("Z", "+00:00"))
+                closed = datetime.fromisoformat(str(market["closedTime"]).replace(" ", "T").replace("+00", "+00:00").replace("+00:00:00", "+00:00"))
+                token = json.loads(market["clobTokenIds"])[0]
+            except (KeyError, ValueError, TypeError, IndexError):
+                continue
+            as_of = end - timedelta(days=days_before_end)
+            if closed < as_of + timedelta(days=1):
+                continue  # settled before the test's day: nothing to forecast
+            try:
+                history = requests.get("https://clob.polymarket.com/prices-history", headers=_UA, timeout=20, params={
+                    "market": token, "startTs": int((as_of - timedelta(hours=12)).timestamp()), "endTs": int(as_of.timestamp()), "fidelity": 60}).json().get("history") or []
+            except Exception:
+                continue
+            if not history or not 0.08 <= float(history[-1]["p"]) <= 0.92:
+                continue
+            q = polymarket_question(market, as_of, float(history[-1]["p"]))
+            if q is None:
+                continue
+            events.add(event)
+            chosen.append(q)
+            if len(chosen) >= n:
+                return chosen
+        if len(page) < 100:
+            break
+    return chosen
+
+
 async def _resolved(client: MetaculusClient, tournament: str | int, opened_after: datetime) -> list[MetaculusQuestion]:
     api_filter = ApiFilter(allowed_statuses=["resolved"], allowed_tournaments=[tournament], group_question_mode="exclude", open_time_gt=opened_after)
     try:
@@ -177,18 +252,24 @@ async def run(tournaments: list[str | int], n: int, profile: str, with_baseline:
     resolutions, so the test falls back on tournaments that show them. `opened_after` keeps the questions later than the
     models' training data.
     """
-    client = MetaculusClient()
     questions: list[MetaculusQuestion] = []
     used: list[str] = []
-    for tournament in tournaments:
-        found = await _resolved(client, tournament, opened_after)
-        if found:
-            questions += found
-            used.append(str(tournament))
-        if len(pick(questions, n)) >= n:
-            break
+    if tournaments == ["polymarket"]:
+        now = datetime.now(timezone.utc)
+        questions = list(await asyncio.to_thread(polymarket_closed, n, max(opened_after, now - timedelta(days=30)), now - timedelta(days=2)))
+        used, chosen = ["polymarket"], questions
+        print(f"polymarket: {len(questions)} resolved markets, each forecast as of 7 days before its end")
+    else:
+        client = MetaculusClient()
+        for tournament in tournaments:
+            found = await _resolved(client, tournament, opened_after)
+            if found:
+                questions += found
+                used.append(str(tournament))
+            if len(pick(questions, n)) >= n:
+                break
+        chosen = pick(questions, n)
     tournament = ",".join(used)
-    chosen = pick(questions, n)
     from collections import Counter
     print("what was read:", dict(Counter(type(q).__name__ for q in questions)),
           "| with an opening time:", sum(1 for q in questions if q.open_time),
@@ -208,6 +289,10 @@ async def run(tournaments: list[str | int], n: int, profile: str, with_baseline:
             break
         as_of = q.open_time.astimezone(timezone.utc) + timedelta(hours=1)
         row: dict[str, Any] = {"url": q.page_url, "kind": type(q).__name__, "as_of": as_of.isoformat(), "resolution": str(q.resolution_string)}
+        market_price = q.community_prediction_at_access_time if isinstance(q, BinaryQuestion) and "polymarket.com" in q.page_url else None
+        if market_price is not None:
+            row["question"] = q.question_text
+            row["market"] = {"forecast": market_price, **score_binary(market_price, bool(q.typed_resolution))}
         mine = PrizeBot(profile_name=profile, as_of=as_of, shared_research=shared, publish_reports_to_metaculus=False, skip_previously_forecasted_questions=False)
         row["prize"] = await _one(mine, q)
         row["news_chars"] = len(shared.get(str(q.id_of_question or q.page_url), ""))
@@ -222,6 +307,10 @@ async def run(tournaments: list[str | int], n: int, profile: str, with_baseline:
     total, by_model = metering.spent_since(start)
     key_after = metering.key_status()
     summary = summarise(rows, bots)
+    if any("market" in r for r in rows):
+        summary["market"] = summarise(rows, ["market"])["market"]
+        for bot in bots:
+            summary[f"{bot}_against_the_market"] = summarise(rows, [bot, "market"]).get("head_to_head")
     summary.update({
         "profile": profile, "tournament": str(tournament), "usd_at_list_prices": round(total, 4), "by_model": by_model,
         "key_meter_usd": None if not (key_before and key_after and key_before["usage"] is not None and key_after["usage"] is not None)

@@ -179,9 +179,10 @@ if __name__ == "__main__":
     parser.add_argument("--mode", choices=["tournament", "test_questions", "backtest", "selftest"], default="tournament")
     parser.add_argument("--n", type=int, default=6, help="backtest / test_questions: how many questions")
     parser.add_argument("--profile", default="lean", choices=sorted(cfg.PROFILES), help="backtest: the bot's profile")
-    parser.add_argument("--tournament", default="season,minibench,cup,summer",
-                        help="backtest: tournaments tried in turn until enough closed questions show their resolution: "
-                             "'season', 'minibench', 'cup', 'summer', or ids or slugs, comma-separated")
+    parser.add_argument("--tournament", default="polymarket",
+                        help="backtest: where the closed questions come from. 'polymarket': resolved Polymarket markets of the "
+                             "last 30 days (not tournament questions). Or Metaculus tournaments tried in turn while their "
+                             "resolutions are shown: 'season', 'minibench', 'cup', 'summer', or ids, comma-separated")
     parser.add_argument("--opened-after", default="2026-08-15", help="backtest: only questions opened after this day (later than the models' training data)")
     parser.add_argument("--no-baseline", action="store_true", help="backtest: skip the template's default bot")
     parser.add_argument("--max-usd", type=float, default=1.0, help="backtest: stop opening questions past this spend")
