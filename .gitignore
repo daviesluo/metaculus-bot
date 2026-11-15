@@ -174,3 +174,7 @@ cython_debug/
 
 # Local scratch/temp scripts
 temp/
+
+# The bot's own files
+.state/
+backtest_results.json

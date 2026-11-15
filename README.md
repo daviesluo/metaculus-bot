@@ -1,3 +1,83 @@
+# daviesluo-bot: a forecasting bot for Metaculus' FutureEval tournaments
+
+This repository is a fork of Metaculus' bot template. The template's own guide is kept below, unchanged; this section
+says what this fork adds and how it is run.
+
+## What it does
+
+Every 20 minutes a GitHub Action looks for new questions in MiniBench and in the season's bot tournament, forecasts each
+once, and posts the forecast with its reasoning (a private comment) to Metaculus. For each question it:
+
+1. **researches** it twice over: a news search (AskNews) and a web-searching model, and looks for prediction markets
+   on the same subject (Polymarket, Manifold);
+2. **forecasts** it with several different models at high reasoning effort, each seeing the same research
+   (`bot_config.py` lists them);
+3. takes the **median** (the median curve for a numeric question), keeps it away from the extremes, and, when a
+   real-money market asks exactly the same question, moves a binary forecast half way to the market's price.
+
+Binary, multiple-choice, numeric, date and conditional questions are handled. The files:
+
+| file | what it is |
+|---|---|
+| `bot_config.py` | the models, the clamps, the market anchor, the budget guards and the `LIVE` switch |
+| `forecaster.py` | the bot: research, prompts, the ensemble, the final number |
+| `markets.py` | the keyless market search and the same-question check |
+| `metering.py` | tokens and dollars: what a run spent, and the OpenRouter key's own meter |
+| `run_bot.py` | the entry point (`--mode tournament`, `test_questions`, `backtest`, `selftest`) |
+| `backtest.py` | tests on closed questions, scored against their resolutions, beside the template's default bot |
+| `selftest.py` | offline checks of the bot's arithmetic |
+| `main.py` | the template's bot, unchanged: the baseline the tests compare against |
+| `EXPERIMENTS.md` | what was tested and what it showed |
+| `DECISIONS.md` | every change to the bot, with its reason |
+
+## The rules it is run under
+
+- **No human in the loop.** Nobody looks at the bot's forecasts on open or upcoming tournament questions in order to
+  change the bot, and no forecast is re-run because someone disliked it. The scheduled run's log (public, like this
+  repository) lists the questions it forecast and what it spent, never a forecast or its reasoning.
+- **Tests use closed questions only**: questions that have already resolved (`backtest`), or Metaculus' bot-testing
+  area, which is not a prize tournament (`test_questions`).
+- **A change after launch** comes from closed questions' results or from general reasoning, and is written down in
+  `DECISIONS.md` with its reason before it runs.
+- **Other forecasts.** The bot reads public prediction markets. It does not read or copy the Metaculus community
+  prediction.
+
+## Money and failures
+
+- A question's worst-case cost is known before it is asked (every model call has an output cap). A run takes no
+  question that the OpenRouter key's remaining budget does not cover, and at most 25 questions.
+- A run **fails**, which GitHub reports to the repository's owner, when a question could not be forecast or the budget
+  does not cover the questions left. A question that failed twice is not tried again (and keeps the run failing until
+  someone looks), so a broken question cannot spend all night.
+- A question already forecast is skipped; runs never overlap (one concurrency group). Nothing is posted twice.
+- The key's own spending cap is the last line: past it OpenRouter refuses every call.
+
+## The stop rule
+
+Read only from **final, published** results, never from open questions:
+
+> If the bot finishes **below the middle of the table in two MiniBench rounds** with the market anchor on, the schedule
+> is switched off (`LIVE = False`). It comes back only with a fix that closed questions' results support, written in
+> `DECISIONS.md`; otherwise it stays off.
+
+A round's place is read from its leaderboard once Metaculus has published it as final. The weekly "Review recent
+forecasts" workflow (manual, read-only) scores the bot's own resolved forecasts for the same purpose.
+
+## Running it
+
+| what | how |
+|---|---|
+| the schedule | the workflow "Forecast on new AI tournament questions"; it forecasts only while `bot_config.LIVE` is `True` |
+| a test on closed questions | the workflow "Test Bot", mode `backtest` |
+| the publishing path | "Test Bot", mode `test_questions` (posts on the bot-testing area) |
+| the offline checks | `python run_bot.py --mode selftest` |
+
+Secrets (repository secrets, never in a file or a log): `METACULUS_TOKEN`, `OPENROUTER_API_KEY`, `ASKNEWS_API_KEY`.
+The Metaculus Cup workflow of the template is removed: the Cup is a human tournament with no prize for bots, and
+forecasting it would spend the budget for nothing.
+
+---
+
 # Simple Metaculus forecasting bot
 This repository contains a simple bot meant to get you started with creating your own bot for the AI Forecasting Tournament. Go to https://www.metaculus.com/futureeval/participate/ for more info and tournament rules (and then go to the  "Getting Started" section of our [resources](https://www.metaculus.com/notebooks/38928/ai-benchmark-resources/#want-to-join-the-ai-forecasting-benchmark) page).
 

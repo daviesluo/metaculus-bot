@@ -3,20 +3,18 @@ name: Forecast on new AI tournament questions
 on:
   workflow_dispatch:
   schedule:
-    - cron: "7,27,47 * * * *" # every 20 min, offset off the hour. Make sure to skip already-forecasted questions!
+    - cron: "7,27,47 * * * *" # every 20 minutes, off the hour. A question already forecast is skipped.
 
-# Add concurrency group to prevent parallel runs
+# One run at a time: a run that overruns makes the next one wait, never run beside it.
 concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: false
 
-
-# Daily job to run the simple forecast bot
 jobs:
   forecast_job:
-    runs-on: ubuntu-latest # determines the machine that will run the job - keep as is
-    steps: # sets up the steps that will be run in order
-      # setup repository with all necessary dependencies - keep as is
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
       - name: Check out repository
         uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -28,17 +26,25 @@ jobs:
           version: "0.13.1"
       - name: Install dependencies
         run: uv sync --locked
+      # Which questions have already failed, so that a broken one is tried twice and then left (and reported).
+      - name: Restore the attempt record
+        uses: actions/cache/restore@v4
+        with:
+          path: .state
+          key: bot-state-${{ github.run_id }}
+          restore-keys: bot-state-
       - name: Run bot
-        run: |
-          uv run python main.py
-        # this reads the environment variables from the github repository.
-        # Store under Settings --> Secrets and variables --> Actions
+        id: bot
+        # Prints which questions were forecast and what was spent; never a forecast. Exits non-zero (a failed run,
+        # which GitHub reports) when a question failed or the budget does not cover the questions left.
+        run: uv run python run_bot.py --mode tournament
         env:
-          METACULUS_TOKEN: ${{ secrets.METACULUS_TOKEN }} # replace this with the name of the variable under which you stored your own Metaculus token
-          PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
-          EXA_API_KEY: ${{ secrets.EXA_API_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          METACULUS_TOKEN: ${{ secrets.METACULUS_TOKEN }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          ASKNEWS_CLIENT_ID: ${{ secrets.ASKNEWS_CLIENT_ID }}
-          ASKNEWS_SECRET: ${{ secrets.ASKNEWS_SECRET }}
+          ASKNEWS_API_KEY: ${{ secrets.ASKNEWS_API_KEY }}
+      - name: Save the attempt record
+        if: always() && steps.bot.outputs.state_changed == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .state
+          key: bot-state-${{ github.run_id }}

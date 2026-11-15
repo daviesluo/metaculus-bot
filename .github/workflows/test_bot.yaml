@@ -1,20 +1,41 @@
 name: Test Bot
 
+# Manual only. Three kinds of test, none on an open tournament question:
+#   backtest        forecast CLOSED tournament questions as of their opening and score them against their resolutions,
+#                   beside the template's default bot. Publishes nothing.
+#   test_questions  publish on Metaculus' bot-testing area (not a prize tournament), to prove the publishing path.
+#   selftest        offline checks of the bot's arithmetic. No key is used.
 on:
   workflow_dispatch:
+    inputs:
+      mode:
+        description: "backtest, test_questions or selftest"
+        default: "backtest"
+      n:
+        description: "How many questions"
+        default: "6"
+      profile:
+        description: "backtest: the bot's profile (lean or standard)"
+        default: "lean"
+      tournament:
+        description: "backtest: season, minibench, or a tournament id"
+        default: "season"
+      baseline:
+        description: "backtest: also run the template's default bot (true or false)"
+        default: "true"
+      max_usd:
+        description: "backtest: stop opening questions past this spend, in dollars"
+        default: "1.0"
 
-# Add concurrency group to prevent parallel runs
 concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: false
 
-
-# Daily job to run the simple forecast bot
 jobs:
-  forecast_job:
-    runs-on: ubuntu-latest # determines the machine that will run the job - keep as is
-    steps: # sets up the steps that will be run in order
-      # setup repository with all necessary dependencies - keep as is
+  test_job:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
       - name: Check out repository
         uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -26,17 +47,25 @@ jobs:
           version: "0.13.1"
       - name: Install dependencies
         run: uv sync --locked
-      - name: Run bot
+      - name: Run the test
         run: |
-          uv run python main.py --mode test_questions
-        # this reads the environment variables from the github repository.
-        # Store under Settings --> Secrets and variables --> Actions
+          uv run python run_bot.py --mode "$MODE" --n "$N" --profile "$PROFILE" --tournament "$TOURNAMENT" \
+            --max-usd "$MAX_USD" $([ "$BASELINE" = "true" ] || echo --no-baseline) --out backtest_results.json
         env:
-          METACULUS_TOKEN: ${{ secrets.METACULUS_TOKEN }} # replace this with the name of the variable under which you stored your own Metaculus token
-          PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
-          EXA_API_KEY: ${{ secrets.EXA_API_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          MODE: ${{ inputs.mode }}
+          N: ${{ inputs.n }}
+          PROFILE: ${{ inputs.profile }}
+          TOURNAMENT: ${{ inputs.tournament }}
+          BASELINE: ${{ inputs.baseline }}
+          MAX_USD: ${{ inputs.max_usd }}
+          METACULUS_TOKEN: ${{ secrets.METACULUS_TOKEN }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          ASKNEWS_CLIENT_ID: ${{ secrets.ASKNEWS_CLIENT_ID }}
-          ASKNEWS_SECRET: ${{ secrets.ASKNEWS_SECRET }}
+          ASKNEWS_API_KEY: ${{ secrets.ASKNEWS_API_KEY }}
+      - name: Keep the results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: backtest_results.json
+          if-no-files-found: ignore
+          retention-days: 90
