@@ -74,6 +74,7 @@ forecasts" workflow (manual, read-only) scores the bot's own resolved forecasts 
 | a test on closed questions | the workflow "Test Bot", mode `backtest` |
 | the publishing path | "Test Bot", mode `test_questions` (posts on the bot-testing area) |
 | the offline checks | `python run_bot.py --mode selftest` |
+| what the tournaments hold | "Test Bot", mode `status`: questions by status, and how many the bot has forecast |
 
 Secrets (repository secrets, never in a file or a log): `METACULUS_TOKEN`, `OPENROUTER_API_KEY`, `ASKNEWS_API_KEY`.
 The Metaculus Cup workflow of the template is removed: the Cup is a human tournament with no prize for bots, and

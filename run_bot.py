@@ -5,6 +5,7 @@ The bot's entry point.
   python run_bot.py --mode test_questions    publish on Metaculus' bot-testing area (not a prize tournament)
   python run_bot.py --mode backtest          forecast CLOSED questions as of their opening and score them (no publishing)
   python run_bot.py --mode selftest          offline checks of the bot's own arithmetic (no key, no network)
+  python run_bot.py --mode status            how many questions each tournament holds, by status (no forecast is read)
 
 The scheduled run prints which questions it forecast and what it spent, never a forecast or its reasoning: the
 repository's logs are public, and the tournament forbids its maker from previewing forecasts on open questions.
@@ -168,6 +169,31 @@ def run_tournament() -> int:
     return 0
 
 
+def run_status() -> int:
+    """What is in the two tournaments: how many questions by status, and when they opened or will. No forecast is read."""
+    check_environment(strict=True)
+    from forecasting_tools import ApiFilter, MetaculusClient
+
+    client = MetaculusClient()
+
+    def day(t) -> str:
+        return t.strftime("%Y-%m-%d %H:%M") if t else "?"
+
+    for name, tid in (("minibench", client.CURRENT_MINIBENCH_ID), ("season", client.CURRENT_AI_COMPETITION_ID)):
+        for status in ("upcoming", "open", "closed", "resolved"):
+            api_filter = ApiFilter(allowed_tournaments=[tid], allowed_statuses=[status], group_question_mode="unpack_subquestions")
+            try:
+                questions = asyncio.run(client.get_questions_matching_filter(api_filter))
+            except Exception as e:
+                print(f"{name} {status}: could not be read ({type(e).__name__}: {mask(str(e))})")
+                continue
+            opened = sorted(q.open_time for q in questions if q.open_time)
+            ours = sum(1 for q in questions if q.already_forecasted)
+            print(f"{name} {status}: {len(questions)} questions" + (f", {ours} forecast by this bot" if status != "upcoming" else "")
+                  + (f"; opening from {day(opened[0])} to {day(opened[-1])} UTC" if opened else ""))
+    return 0
+
+
 def run_test_questions(limit: int, profile: str = "lean") -> int:
     check_environment(strict=True)
     from forecasting_tools import ForecastReport, MetaculusClient
@@ -200,7 +226,7 @@ def run_test_questions(limit: int, profile: str = "lean") -> int:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run the forecasting bot")
-    parser.add_argument("--mode", choices=["tournament", "test_questions", "backtest", "selftest"], default="tournament")
+    parser.add_argument("--mode", choices=["tournament", "test_questions", "backtest", "selftest", "status"], default="tournament")
     parser.add_argument("--n", type=int, default=6, help="backtest / test_questions: how many questions")
     parser.add_argument("--profile", default="lean", choices=sorted(cfg.PROFILES), help="backtest: the bot's profile")
     parser.add_argument("--tournament", default="polymarket",
@@ -228,6 +254,8 @@ if __name__ == "__main__":
         sys.exit(run_tournament())
     if args.mode == "test_questions":
         sys.exit(run_test_questions(args.n, args.profile))
+    if args.mode == "status":
+        sys.exit(run_status())
     check_environment(strict=True)
     import backtest
     from forecasting_tools import MetaculusClient

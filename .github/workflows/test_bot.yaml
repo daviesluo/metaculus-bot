@@ -1,15 +1,16 @@
 name: Test Bot
 
-# Manual only. Three kinds of test, none on an open tournament question:
+# Manual only. Three kinds of test, none on an open tournament question, and a count:
 #   backtest        forecast CLOSED tournament questions as of their opening and score them against their resolutions,
 #                   beside the template's default bot. Publishes nothing.
 #   test_questions  publish on Metaculus' bot-testing area (not a prize tournament), to prove the publishing path.
 #   selftest        offline checks of the bot's arithmetic. No key is used.
+#   status          how many questions MiniBench and the season hold, by status. Reads no forecast, spends nothing.
 on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "backtest, test_questions or selftest"
+        description: "backtest, test_questions, selftest or status"
         default: "backtest"
       n:
         description: "How many questions"
