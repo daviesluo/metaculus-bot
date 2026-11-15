@@ -95,7 +95,8 @@ def run_tournament() -> int:
 
     client = MetaculusClient()
     tournaments = {"minibench": client.CURRENT_MINIBENCH_ID, "season": client.CURRENT_AI_COMPETITION_ID}
-    todo = {name: [q for q in client.get_all_open_questions_from_tournament(tid) if not q.already_forecasted] for name, tid in tournaments.items()}
+    every = {name: client.get_all_open_questions_from_tournament(tid) for name, tid in tournaments.items()}
+    todo = {name: [q for q in questions if not q.already_forecasted] for name, questions in every.items()}
     key = metering.key_status()
     remaining = key["remaining"] if key else None
     if key is None:
@@ -136,7 +137,7 @@ def run_tournament() -> int:
         bad = [r for r in reports if isinstance(r, BaseException)]
         failed += len(bad)
         extra = results.get(name + "_anchored") or [0, {}]
-        print(f"{name}: {len(todo[name])} unforecast, {len(taken[name])} taken, {len(ok)} forecast, {len(bad)} failed"
+        print(f"{name}: {len(every[name])} open, {len(todo[name])} of them not yet forecast, {len(taken[name])} taken, {len(ok)} forecast, {len(bad)} failed"
               f" (profile {cfg.TOURNAMENT_PROFILE[name]}; anchored on a market: {extra[0]}; research that failed, by source: {extra[1]})")
         for r in ok:
             print(f"  ok   {r.question.page_url}")
