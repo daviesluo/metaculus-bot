@@ -109,7 +109,7 @@ it is funded, adds prompt tokens: about a cent a question on `standard`, a tenth
 
 No forecast on an open question is read or shown, here or anywhere: only how many there were and what they cost.
 
-- 2026-11-15, 08:46 to 15:42 UTC: 29 looks, about 15 minutes apart, by nine runs that each started the next. No run
+- 2026-11-15, 08:46 to 15:42 UTC: 36 looks, about 15 minutes apart, by nine runs that each started the next. No run
   failed.
 - One season question opened in that time (15:00 UTC). The look at 15:10 forecast it and posted it; the two looks after
   found it already forecast and left it. **$0.0218** at list prices, $0.0226 on the key's meter. The news search was
