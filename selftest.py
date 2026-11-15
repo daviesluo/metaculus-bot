@@ -87,11 +87,16 @@ def main() -> int:
     q = lambda i: SimpleNamespace(id_of_question=i)  # noqa: E731
     cfg_profile = dict(cfg.TOURNAMENT_PROFILE)
     cfg.TOURNAMENT_PROFILE.update({"minibench": "lean", "season": "lean"})
+    todo = {"minibench": [q(1), q(2), q(3)], "season": [q(4)]}
+    taken, left = plan_questions(todo, {"2": MAX_ATTEMPTS}, cfg.MIN_KEY_REMAINING_USD + 1.5 * lean_worst)
+    ok("plan: MiniBench first, a twice-failed question left, what the budget does not cover left",
+       [x.id_of_question for x in taken["minibench"]] == [1] and taken["season"] == []
+       and left == {"gave_up": 1, "run_full": 0, "no_budget": 2, "held_for_minibench": 0})
     todo = {"minibench": [q(1), q(2)], "season": [q(3), q(4), q(5)]}
-    taken, left = plan_questions(todo, {"2": MAX_ATTEMPTS}, cfg.MIN_KEY_REMAINING_USD + 2.5 * lean_worst)
-    ok("plan: MiniBench first, a twice-failed question left, the budget's last question left",
-       [x.id_of_question for x in taken["minibench"]] == [1] and [x.id_of_question for x in taken["season"]] == [3]
-       and left == {"gave_up": 1, "run_full": 0, "no_budget": 2})
+    taken, left = plan_questions(todo, {}, cfg.MIN_KEY_REMAINING_USD + cfg.SEASON_RESERVE_USD + 4.5 * lean_worst)
+    ok("plan: the season stops at what is kept for MiniBench, as a hold and not a shortage",
+       len(taken["minibench"]) == 2 and [x.id_of_question for x in taken["season"]] == [3, 4]
+       and left == {"gave_up": 0, "run_full": 0, "no_budget": 0, "held_for_minibench": 1})
     taken, left = plan_questions(todo, {}, None)
     ok("plan: no meter, everything within the run's size", sum(len(v) for v in taken.values()) == 5 and left["no_budget"] == 0)
     taken, left = plan_questions({"minibench": [q(i) for i in range(40)], "season": []}, {}, None)

@@ -9,7 +9,8 @@ Every 20 minutes a GitHub Action looks for new questions in MiniBench and in the
 once, and posts the forecast with its reasoning (a private comment) to Metaculus. For each question it:
 
 1. **researches** it twice over: a news search (AskNews) and a web-searching model, and looks for prediction markets
-   on the same subject (Polymarket, Manifold);
+   on the same subject (Polymarket, Manifold). A question with no research at all is not forecast: it fails and is
+   tried once more;
 2. **forecasts** it with several different models at high reasoning effort, each seeing the same research
    (`bot_config.py` lists them);
 3. takes the **median** (the median curve for a numeric question), keeps it away from the extremes, and, when a
@@ -46,6 +47,8 @@ Binary, multiple-choice, numeric, date and conditional questions are handled. Th
 
 - A question's worst-case cost is known before it is asked (every model call has an output cap). A run takes no
   question that the OpenRouter key's remaining budget does not cover, and at most 25 questions.
+- MiniBench comes first. The season is forecast only while the key holds more than a MiniBench round's cost
+  (`SEASON_RESERVE_USD`); season questions held back for that show as a warning on the run, not a failure.
 - A run **fails**, which GitHub reports to the repository's owner, when a question could not be forecast or the budget
   does not cover the questions left. A question that failed twice is not tried again (and keeps the run failing until
   someone looks), so a broken question cannot spend all night.

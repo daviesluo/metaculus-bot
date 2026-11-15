@@ -57,27 +57,30 @@ def _save_attempts(attempts: dict[str, int], before: dict[str, int]) -> None:
 def plan_questions(todo: dict[str, list], attempts: dict[str, int], remaining_usd: float | None) -> tuple[dict[str, list], dict[str, int]]:
     """
     Which of the unforecast questions this run takes, by tournament, and what it leaves and why.
-    MiniBench first. A question is left when it has already failed MAX_ATTEMPTS times, when the run is full, or when
-    the key's remaining budget (less a reserve) does not cover its profile's worst case.
+    MiniBench first. A question is left when it has already failed MAX_ATTEMPTS times, when the run is full, when the
+    key's remaining budget does not cover its profile's worst case, or, for the season, when taking it would eat into
+    what is kept for MiniBench.
     """
     taken: dict[str, list] = {name: [] for name in todo}
-    left = {"gave_up": 0, "run_full": 0, "no_budget": 0}
-    budget = None if remaining_usd is None else remaining_usd - cfg.MIN_KEY_REMAINING_USD
-    count = 0
+    left = {"gave_up": 0, "run_full": 0, "no_budget": 0, "held_for_minibench": 0}
+    planned, count = 0.0, 0
     for name, questions in todo.items():
         worst = metering.worst_case_question_cost(cfg.PROFILES[cfg.TOURNAMENT_PROFILE[name]])
+        reserve = cfg.SEASON_RESERVE_USD if name == "season" else 0.0
         for q in questions:
+            after = None if remaining_usd is None else remaining_usd - planned - worst
             if attempts.get(str(q.id_of_question), 0) >= MAX_ATTEMPTS:
                 left["gave_up"] += 1
             elif count >= cfg.MAX_QUESTIONS_PER_RUN:
                 left["run_full"] += 1
-            elif budget is not None and budget < worst:
+            elif after is not None and after < cfg.MIN_KEY_REMAINING_USD:
                 left["no_budget"] += 1
+            elif after is not None and after < cfg.MIN_KEY_REMAINING_USD + reserve:
+                left["held_for_minibench"] += 1
             else:
                 taken[name].append(q)
                 count += 1
-                if budget is not None:
-                    budget -= worst
+                planned += worst
     return taken, left
 
 
@@ -151,6 +154,10 @@ def run_tournament() -> int:
         print(f"OpenRouter key: ${key_after['usage']} used of {key_after['limit']} (remaining {key_after['remaining']})")
     print(f"left for later: {left}")
     print("=" * 80)
+    if left["held_for_minibench"]:
+        # A warning on the run's page, not a failure: holding the season back is the plan when money is short.
+        print(f"::warning::{left['held_for_minibench']} season question(s) not forecast: the OpenRouter key holds less than the "
+              f"${cfg.SEASON_RESERVE_USD:.2f} kept for MiniBench on top of them. Raise the key's cap to forecast the season.")
     if failed or left["no_budget"] or left["gave_up"]:
         if left["no_budget"]:
             print("FAILING THE RUN: the OpenRouter budget does not cover the questions left. Raise the key's cap.")

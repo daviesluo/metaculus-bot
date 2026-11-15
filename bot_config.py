@@ -68,3 +68,7 @@ TOURNAMENT_PROFILE = {"minibench": "lean", "season": "lean"}
 MAX_QUESTIONS_PER_RUN = 25
 # A run stops opening questions when the key has less than this left, and fails so that it is seen.
 MIN_KEY_REMAINING_USD = 0.25
+# The season is forecast only while the key holds more than this as well: about what one MiniBench round costs on its
+# profile (60 questions). MiniBench is where a prize can be won, so the season never spends its money. A season
+# question held back for this is a warning on the run, not a failure.
+SEASON_RESERVE_USD = 1.50

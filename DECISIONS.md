@@ -20,6 +20,9 @@ From EXPERIMENTS.md §2 and §3. No tournament question had been forecast.
 - **The standard profile rebuilt**: Gemini 4 Carbon with a reasoning cap of its own (it spent a 12,000-token output on
   reasoning and answered nothing in 3 calls of 5); Grok 4.7 out (five times the others' cost at high reasoning), Opus
   5.5 in. $0.19 a question, from $0.31.
+- **MiniBench's money is kept from the season.** A MiniBench round is a fresh contest; the season was joined half way,
+  where a prize (the square of the summed score) is out of reach. The season is forecast only while the key holds more
+  than one MiniBench round's cost (`SEASON_RESERVE_USD`, $1.50 at `lean`).
 - **Both tournaments on `lean` for now**: the budget in hand covers nothing else. `standard` on MiniBench is the plan
   once the budget allows; that switch needs no new evidence (frontier models are the first of Metaculus' own findings).
 
