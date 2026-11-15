@@ -170,8 +170,12 @@ def run_tournament() -> int:
 
 
 def run_status() -> int:
-    """What is in the two tournaments: how many questions by status, and when they opened or will. No forecast is read."""
+    """What is in the two tournaments: how many questions by status, when they open and for how long. No forecast is read."""
     check_environment(strict=True)
+    from collections import Counter
+    from statistics import median
+
+    import requests
     from forecasting_tools import ApiFilter, MetaculusClient
 
     client = MetaculusClient()
@@ -180,6 +184,14 @@ def run_status() -> int:
         return t.strftime("%Y-%m-%d %H:%M") if t else "?"
 
     for name, tid in (("minibench", client.CURRENT_MINIBENCH_ID), ("season", client.CURRENT_AI_COMPETITION_ID)):
+        try:  # the tournament's own card: is the id the right one, and when does it run
+            r = requests.get(f"https://www.metaculus.com/api/projects/tournaments/{tid}/", timeout=20,
+                             headers={"Authorization": f"Token {os.getenv('METACULUS_TOKEN')}", "Accept": "application/json"})
+            card = r.json() if r.ok else {}
+            print(f"{name} ({tid}): HTTP {r.status_code}; " + "; ".join(f"{k} {card.get(k)}" for k in
+                  ("id", "slug", "name", "start_date", "close_date", "forecasting_end_date", "questions_count", "is_ongoing") if k in card))
+        except Exception as e:
+            print(f"{name} ({tid}): its card could not be read ({type(e).__name__})")
         for status in ("upcoming", "open", "closed", "resolved"):
             api_filter = ApiFilter(allowed_tournaments=[tid], allowed_statuses=[status], group_question_mode="unpack_subquestions")
             try:
@@ -191,6 +203,11 @@ def run_status() -> int:
             ours = sum(1 for q in questions if q.already_forecasted)
             print(f"{name} {status}: {len(questions)} questions" + (f", {ours} forecast by this bot" if status != "upcoming" else "")
                   + (f"; opening from {day(opened[0])} to {day(opened[-1])} UTC" if opened else ""))
+            hours = sorted((q.close_time - q.open_time).total_seconds() / 3600 for q in questions if q.open_time and q.close_time)
+            if hours:
+                print(f"    open for {hours[0]:.1f} to {hours[-1]:.1f} hours, median {median(hours):.1f}; opening hour (UTC): "
+                      f"{dict(sorted(Counter(t.hour for t in opened).items()))}; weekday (Mon=0): {dict(sorted(Counter(t.weekday() for t in opened).items()))}; "
+                      f"days with an opening: {len({t.date() for t in opened})}")
     return 0
 
 
